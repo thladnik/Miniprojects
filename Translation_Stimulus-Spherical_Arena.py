@@ -283,23 +283,22 @@ def createFragmentedTranslationStimulus(verts, whole_field, **masked_stimuli):
         elif mask_type == 'right_lower_hemi':
             mask = createSimpleMask(verts, -np.pi, .0, -np.pi/2, .0)
 
-        elif mask_type == 'left_horiz_stripe':
-            mask = createHorizontalStripeMask(verts, 0., 0., np.pi/4)
-
-        elif mask_type == 'horizontal_stripe':
-            mask = createHorizontalStripeMask(verts, -np.pi/2, np.pi/4, np.pi/16)
-            #IPython.embed()
-
         ## Complex masks
-        elif isinstance(mask_type, tuple):
-            if mask_type[0] == 'horizontal_stripe':
-                mask = createHorizontalStripeMask(verts, *mask_type[1])
-            elif mask_type[0] == 'vertical_stripe':
-                pass
+        elif mask_type == 'translation_stripes_upper_left':
+            mask = createHorizontalStripeMask(verts, np.pi/2, .0, np.pi/4)
+
+        elif mask_type == 'translation_stripes_upper_right':
+            mask = createHorizontalStripeMask(verts, -np.pi/2, .0, np.pi/4)
+
+        elif mask_type[0] == 'vertical_stripe':
+            pass
 
         # Ass masked stimulus to final stimulus
         if mask is not None:
-            stimulus[:,mask,:] = masked_stimuli[mask_type][:,mask,:]
+            if isinstance(masked_stimuli[mask_type], tuple):
+                stimulus[:,mask,:] = masked_stimuli[mask_type][-1][:, mask, :]
+            else:
+                stimulus[:,mask,:] = masked_stimuli[mask_type][:,mask,:]
         else:
             print('WARNING: no mask for type "%s"' % mask_type)
 
@@ -308,7 +307,6 @@ def createFragmentedTranslationStimulus(verts, whole_field, **masked_stimuli):
 
 
 if __name__ == '__main__':
-
 
     use_iso = True
     if use_iso:
@@ -325,26 +323,29 @@ if __name__ == '__main__':
         verts = md.vertexes()
 
     # Create custom pattern
-    pattern = Pattern.Bars(sf=2.)
+    pattern1 = Pattern.Bars(sf=2.)
+    pattern2 = Pattern.Bars(sf=.7)
 
     # Create translation stimulus
-    background = createTranslationStimulus(verts, pattern=pattern, duration=20., v=.0)
-    foreground = createTranslationStimulus(verts, pattern=pattern, duration=20., v=1.)
+    background = createTranslationStimulus(verts, pattern=pattern2, duration=20., v=-.3)
+    foreground = createTranslationStimulus(verts, pattern=pattern1, duration=20., v=1.)
 
     masks = {
         'whole_field': background,
         #'right_lower_hemi' : foreground,
-        'horizontal_stripe': foreground
-    }
+        #'horizontal_stripe': foreground
+        'translation_stripes_upper_left': foreground,
+        'translation_stripes_upper_right': foreground
+        }
     stimulus = createFragmentedTranslationStimulus(md.vertexes(), **masks)
 
     # Setup app and window
     app = QtWidgets.QApplication([])
     w = gl.GLViewWidget()
-    w.resize(QtCore.QSize(1000, 1000))
+    w.resize(QtCore.QSize(800, 800))
     w.show()
     w.setWindowTitle('Stimulus preview')
-    w.setCameraPosition(distance=5, azimuth=0)
+    w.setCameraPosition(distance=3, azimuth=0)
 
     # Create MeshItem
     g = gl.GLGridItem()
