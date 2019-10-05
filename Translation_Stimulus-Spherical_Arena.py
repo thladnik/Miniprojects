@@ -202,8 +202,6 @@ def createTranslationStimulus(verts, v: float = 1., duration: float = 5., framet
     """
 
     # Calculate azimuth and elevation from cartesian
-    #theta, phi, _ = cart2sph(verts[:, 2], verts[:, 0], verts[:, 1])
-    #theta, phi, _ = cart2sph(verts[:, 0], verts[:, 1], verts[:, 2])
     theta, phi, _ = cart2sph(verts[:, 1], verts[:, 2], verts[:, 0])
     # Calculate projections on cylinder
     tex_coords = np.array(centralCylindrical2DTexture(theta, phi)).T
@@ -342,7 +340,7 @@ if __name__ == '__main__':
     # Setup app and window
     app = QtWidgets.QApplication([])
     w = gl.GLViewWidget()
-    w.resize(QtCore.QSize(800, 800))
+    w.resize(QtCore.QSize(600, 600))
     w.show()
     w.setWindowTitle('Stimulus preview')
     w.setCameraPosition(distance=3, azimuth=0)
