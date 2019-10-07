@@ -3,6 +3,7 @@
 
 # Author Tim Hladnik
 
+import argparse
 import numpy as np
 from numpy import ndarray
 from scipy.spatial.transform import Rotation
@@ -212,7 +213,6 @@ def createHorizontalStripeMask(verts, theta_center, phi_center, phi_max):
 
     theta, phi, _ = cart2sph(verts[:,0], verts[:,1], verts[:,2])
 
-    phi_baseline = -np.sin(theta) * phi_center
     phi_thresh = np.cos(theta-theta_center) * phi_max
 
     mask = np.zeros(verts.shape[0]).astype(bool)
@@ -221,10 +221,9 @@ def createHorizontalStripeMask(verts, theta_center, phi_center, phi_max):
     return mask
 
 
-def createFragmentedTranslationStimulus(verts, whole_field, **masked_stimuli):
+def createFragmentedTranslationStimulus(verts, whole_field = None, **masked_stimuli):
 
-    # Set whole_field as background
-    # TODO: make whole_field optional
+    # Set background
     stimulus = whole_field
 
     for mask_type in masked_stimuli:
@@ -248,25 +247,31 @@ def createFragmentedTranslationStimulus(verts, whole_field, **masked_stimuli):
 
         ## Complex masks
         elif mask_type == 'translation_stripe_left':
-            mask = createHorizontalStripeMask(verts, np.pi/2, -mask_params[0][0], mask_params[0][1])
+            mask = np.zeros(verts.shape[0]).astype(bool)
+            for m in mask_params[:-1]:
+                mask = mask | createHorizontalStripeMask(verts, np.pi/2, -m[0], m[1])
 
         elif mask_type == 'translation_stripe_right':
-            mask = createHorizontalStripeMask(verts, -np.pi/2, mask_params[0][0], mask_params[0][1])
+            mask = np.zeros(verts.shape[0]).astype(bool)
+            for m in mask_params[:-1]:
+                mask = mask | createHorizontalStripeMask(verts, -np.pi/2, -m[0], m[1])
 
         elif mask_type == 'translation_stripe_symmetric':
-            mask = createHorizontalStripeMask(verts, np.pi/2, -mask_params[0][0], mask_params[0][1])
-            mask = mask | createHorizontalStripeMask(verts, -np.pi/2, mask_params[0][0], mask_params[0][1])
+            mask = np.zeros(verts.shape[0]).astype(bool)
+            for m in mask_params[:-1]:
+                mask = mask | createHorizontalStripeMask(verts, np.pi/2, -m[0], m[1])
+                mask = mask | createHorizontalStripeMask(verts, -np.pi/2, m[0], m[1])
 
-
+        ## Additional masks
         elif mask_type[0] == 'vertical_stripe':
             pass
 
         # Ass masked stimulus to final stimulus
         if mask is not None:
-            if isinstance(masked_stimuli[mask_type], tuple):
-                stimulus[:,mask,:] = masked_stimuli[mask_type][-1][:, mask, :]
+            if isinstance(mask_params, tuple):
+                stimulus[:,mask,:] = mask_params[-1][:, mask, :]
             else:
-                stimulus[:,mask,:] = masked_stimuli[mask_type][:,mask,:]
+                stimulus[:,mask,:] = mask_params[:,mask,:]
         else:
             print('WARNING: no mask for type "%s"' % mask_type)
 
@@ -304,8 +309,8 @@ if __name__ == '__main__':
         #'horizontal_stripe': foreground
         #'translation_stripes_upper_left': foreground,
         #'translation_stripes_upper_right': foreground
-        #'translation_stripe_left': ([np.pi/4, np.pi/8], foreground),
-        'translation_stripe_symmetric': ([np.pi/3, np.pi/8], foreground)
+        'translation_stripe_right': ([np.pi/4, np.pi/8], [-np.pi/4, np.pi/8], foreground),
+        #'translation_stripe_symmetric': ([np.pi/3, np.pi/8], foreground)
     }
     stimulus = createFragmentedTranslationStimulus(md.vertexes(), **masks)
 
