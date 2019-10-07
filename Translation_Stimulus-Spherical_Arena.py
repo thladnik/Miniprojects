@@ -74,7 +74,7 @@ class IcosahedronSphere:
         vlen = np.sqrt(x ** 2 + y ** 2 + z ** 2)
         return [i/vlen for i in (x, y, z)]
 
-    def middle_point(self, p1, p2):
+    def midpoint(self, p1, p2):
         key = '%i/%i' % (min(p1, p2), max(p1, p2))
 
         if key in self.cache:
@@ -93,18 +93,18 @@ class IcosahedronSphere:
 
     def subdivide(self):
         for i in range(self.subdiv_lvl):
-            subdiv = []
+            new_faces = []
             for face in self.faces:
-                v = [self.middle_point(face[0], face[1]),
-                     self.middle_point(face[1], face[2]),
-                     self.middle_point(face[2], face[0])]
+                v = [self.midpoint(face[0], face[1]),
+                     self.midpoint(face[1], face[2]),
+                     self.midpoint(face[2], face[0])]
 
-                subdiv.append([face[0], v[0], v[2]])
-                subdiv.append([face[1], v[1], v[0]])
-                subdiv.append([face[2], v[2], v[1]])
-                subdiv.append([v[0], v[1], v[2]])
+                new_faces.append([face[0], v[0], v[2]])
+                new_faces.append([face[1], v[1], v[0]])
+                new_faces.append([face[2], v[2], v[1]])
+                new_faces.append([v[0], v[1], v[2]])
 
-            self.faces = subdiv
+            self.faces = new_faces
 
     def getVertices(self):
         return np.array(self.vertices)
@@ -124,38 +124,6 @@ def centralCylindrical2DTexture(theta, phi):
     y = np.tan(phi)
 
     return x, y
-
-def getThetaSubsetIdcs(verts, theta_low: float, theta_high: float) -> ndarray:
-    """Returns the vertices which have an theta (azimuth) in between
-    a lower and an upper boundary.
-
-    :param theta_low: lower azimuth boundary in degree
-    :param theta_high: upper azimuth boundary in degree
-    :return:
-    """
-
-    thetas, _, _ = cart2sph(verts[:,0], verts[:,1], verts[:,2])
-
-    # Check boundaries
-    if theta_low > theta_high:
-        Exception('Higher azimuth has to exceed lower azimuth.')
-
-    # Adjust boundaries which exceed [0.0, 360.0]
-    while theta_low < 0.0:
-        theta_low += 2*np.pi
-    while theta_high > 2*np.pi:
-        theta_high -= 2*np.pi
-
-    # Filter theta
-    bools = None
-    if theta_high > theta_low:
-        bools = (thetas >= theta_low) & (thetas <= theta_high)
-    elif theta_high < theta_low:
-        bools = (thetas >= theta_low) | (thetas <= theta_high)
-    else:
-        Exception('Higher azimuth has to exceed lower azimuth.')
-
-    return bools
 
 
 class Pattern:
@@ -201,9 +169,9 @@ def createTranslationStimulus(verts, v: float = 1., duration: float = 5., framet
 
     """
 
-    # Calculate azimuth and elevation from cartesian
+    # Calculate azimuth and elevation from cartesian coordinates
     theta, phi, _ = cart2sph(verts[:, 1], verts[:, 2], verts[:, 0])
-    # Calculate projections on cylinder
+    # Calculate central projection on cylinder
     tex_coords = np.array(centralCylindrical2DTexture(theta, phi)).T
 
     # Set pattern if non was provided
@@ -220,13 +188,9 @@ def createTranslationStimulus(verts, v: float = 1., duration: float = 5., framet
 def createSimpleMask(verts, theta_low, theta_high, phi_low, phi_high):
     theta, phi, _ = cart2sph(verts[:,0], verts[:,1], verts[:,2])
 
-    #IPython.embed()
-
-    #mask = getThetaSubsetIdcs(verts, theta_low, theta_high)
-
     mask = np.zeros(verts.shape[0]).astype(bool)
-    #IPython.embed()
-    mask[(theta_low < theta) & (theta < theta_high) & (phi_low < phi) & (phi < phi_high)] = True
+    mask[(theta_low < theta) & (theta < theta_high)
+         & (phi_low < phi) & (phi < phi_high)] = True
 
     return mask
 
@@ -265,6 +229,7 @@ def createFragmentedTranslationStimulus(verts, whole_field, **masked_stimuli):
 
     for mask_type in masked_stimuli:
         print('Apply mask type "%s"' % mask_type)
+        mask_params = masked_stimuli[mask_type]
 
         mask = None
 
@@ -282,11 +247,16 @@ def createFragmentedTranslationStimulus(verts, whole_field, **masked_stimuli):
             mask = createSimpleMask(verts, -np.pi, .0, -np.pi/2, .0)
 
         ## Complex masks
-        elif mask_type == 'translation_stripes_upper_left':
-            mask = createHorizontalStripeMask(verts, np.pi/2, .0, np.pi/4)
+        elif mask_type == 'translation_stripe_left':
+            mask = createHorizontalStripeMask(verts, np.pi/2, -mask_params[0][0], mask_params[0][1])
 
-        elif mask_type == 'translation_stripes_upper_right':
-            mask = createHorizontalStripeMask(verts, -np.pi/2, .0, np.pi/4)
+        elif mask_type == 'translation_stripe_right':
+            mask = createHorizontalStripeMask(verts, -np.pi/2, mask_params[0][0], mask_params[0][1])
+
+        elif mask_type == 'translation_stripe_symmetric':
+            mask = createHorizontalStripeMask(verts, np.pi/2, -mask_params[0][0], mask_params[0][1])
+            mask = mask | createHorizontalStripeMask(verts, -np.pi/2, mask_params[0][0], mask_params[0][1])
+
 
         elif mask_type[0] == 'vertical_stripe':
             pass
@@ -309,7 +279,7 @@ if __name__ == '__main__':
     use_iso = True
     if use_iso:
         print('Using ISO sphere')
-        sphere = IcosahedronSphere(6)
+        sphere = IcosahedronSphere(5)
         verts = sphere.getVertices()
         md = gl.MeshData()
         md.setVertexes(verts)
@@ -325,16 +295,18 @@ if __name__ == '__main__':
     pattern2 = Pattern.Bars(sf=.7)
 
     # Create translation stimulus
-    background = createTranslationStimulus(verts, pattern=pattern2, duration=20., v=-.3)
+    background = createTranslationStimulus(verts, pattern=pattern2, duration=20., v=.0)
     foreground = createTranslationStimulus(verts, pattern=pattern1, duration=20., v=1.)
 
     masks = {
         'whole_field': background,
         #'right_lower_hemi' : foreground,
         #'horizontal_stripe': foreground
-        'translation_stripes_upper_left': foreground,
-        'translation_stripes_upper_right': foreground
-        }
+        #'translation_stripes_upper_left': foreground,
+        #'translation_stripes_upper_right': foreground
+        #'translation_stripe_left': ([np.pi/4, np.pi/8], foreground),
+        'translation_stripe_symmetric': ([np.pi/3, np.pi/8], foreground)
+    }
     stimulus = createFragmentedTranslationStimulus(md.vertexes(), **masks)
 
     # Setup app and window
