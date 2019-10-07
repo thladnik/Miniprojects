@@ -113,18 +113,23 @@ class IcosahedronSphere:
     def getFaces(self):
         return np.array(self.faces)
 
-def cart2sph(x, y, z):
-    hxy = np.hypot(x, y)
-    r = np.hypot(hxy, z)
-    el = np.arctan2(z, hxy)
-    az = np.arctan2(y, x)
-    return az, el, r
 
-def centralCylindrical2DTexture(theta, phi):
-    x = theta
-    y = np.tan(phi)
+class Helper:
 
-    return x, y
+    @staticmethod
+    def cart2sph(x, y, z):
+        hxy = np.hypot(x, y)
+        r = np.hypot(hxy, z)
+        el = np.arctan2(z, hxy)
+        az = np.arctan2(y, x)
+        return az, el, r
+
+    @staticmethod
+    def centralCylindrical2DTexture(theta, phi):
+        x = theta
+        y = np.tan(phi)
+
+        return x, y
 
 
 class Pattern:
@@ -154,12 +159,46 @@ class Pattern:
         return bars
 
 
-class MovingStimulus:
-    pass
+class Mask:
+
+    @staticmethod
+    def createSimpleMask(verts, theta_low, theta_high, phi_low, phi_high):
+        theta, phi, _ = Helper.cart2sph(verts[:, 0], verts[:, 1], verts[:, 2])
+
+        mask = np.zeros(verts.shape[0]).astype(bool)
+        mask[(theta_low < theta) & (theta < theta_high)
+             & (phi_low < phi) & (phi < phi_high)] = True
+
+        return mask
+
+    @staticmethod
+    def createHorizontalRectStripeMask(verts, theta_center, phi_center, phi_range):
+        theta, phi, _ = Helper.cart2sph(verts[:, 0], verts[:, 1], verts[:, 2])
+
+        mask = np.zeros(verts.shape[0]).astype(bool)
+        mask[(theta_center - np.pi / 2 < theta) & (theta < theta_center + np.pi / 2)
+             & (phi_center - phi_range / 2 < phi) & (phi < phi_center + phi_range / 2)] = True
+
+        return mask
+
+    @staticmethod
+    def createHorizontalStripeMask(verts, theta_center, phi_center, phi_range):
+        raxis = np.array([1.0, 0.0, 0.0])
+        r = Rotation.from_rotvec(phi_center * raxis / np.linalg.norm(raxis))
+        verts = r.apply(verts)
+
+        theta, phi, _ = Helper.cart2sph(verts[:, 0], verts[:, 1], verts[:, 2])
+
+        phi_thresh = np.cos(theta - theta_center) * phi_range / 2.
+
+        mask = np.zeros(verts.shape[0]).astype(bool)
+        mask[(theta_center - np.pi / 2 < theta) & (theta < theta_center + np.pi / 2)
+             & (-phi_thresh < phi) & (phi < +phi_thresh)] = True
+        return mask
 
 
 def createTranslationStimulus(verts, v: float = 1., duration: float = 5., frametime: float = .05,
-                              direction: str = 'x', pattern: object = None) -> ndarray:
+                              pattern: object = None) -> ndarray:
     """Function creates a translation stimulus
 
     :param sf: spatial frequency of stimulus
@@ -171,9 +210,9 @@ def createTranslationStimulus(verts, v: float = 1., duration: float = 5., framet
     """
 
     # Calculate azimuth and elevation from cartesian coordinates
-    theta, phi, _ = cart2sph(verts[:, 1], verts[:, 2], verts[:, 0])
+    theta, phi, _ = Helper.cart2sph(verts[:, 1], verts[:, 2], verts[:, 0])
     # Calculate central projection on cylinder
-    tex_coords = np.array(centralCylindrical2DTexture(theta, phi)).T
+    tex_coords = np.array(Helper.centralCylindrical2DTexture(theta, phi)).T
 
     # Set pattern if non was provided
     if pattern is None:
@@ -186,42 +225,8 @@ def createTranslationStimulus(verts, v: float = 1., duration: float = 5., framet
 
     return np.array(stimulus)
 
-def createSimpleMask(verts, theta_low, theta_high, phi_low, phi_high):
-    theta, phi, _ = cart2sph(verts[:,0], verts[:,1], verts[:,2])
 
-    mask = np.zeros(verts.shape[0]).astype(bool)
-    mask[(theta_low < theta) & (theta < theta_high)
-         & (phi_low < phi) & (phi < phi_high)] = True
-
-    return mask
-
-
-def createHorizontalRectStripeMask(verts, theta_center, phi_center, phi_max):
-    theta, phi, _ = cart2sph(verts[:,0], verts[:,1], verts[:,2])
-
-    mask = np.zeros(verts.shape[0]).astype(bool)
-    mask[(theta_center-np.pi/2 < theta) & (theta < theta_center+np.pi/2)
-         & (phi_center-phi_max/2 < phi) & (phi < phi_center+phi_max/2)] = True
-
-    return mask
-
-def createHorizontalStripeMask(verts, theta_center, phi_center, phi_max):
-
-    raxis = np.array([1.0, 0.0, 0.0])
-    r = Rotation.from_rotvec(phi_center * raxis/np.linalg.norm(raxis))
-    verts = r.apply(verts)
-
-    theta, phi, _ = cart2sph(verts[:,0], verts[:,1], verts[:,2])
-
-    phi_thresh = np.cos(theta-theta_center) * phi_max
-
-    mask = np.zeros(verts.shape[0]).astype(bool)
-    mask[(theta_center - np.pi / 2 < theta) & (theta < theta_center + np.pi / 2)
-         & (-phi_thresh < phi) & (phi < +phi_thresh)] = True
-    return mask
-
-
-def createFragmentedTranslationStimulus(verts, whole_field = None, **masked_stimuli):
+def createFragmentedTranslationStimulus(verts, whole_field, **masked_stimuli):
 
     # Set background
     stimulus = whole_field
@@ -234,39 +239,39 @@ def createFragmentedTranslationStimulus(verts, whole_field = None, **masked_stim
 
         ## Simple masks
         if mask_type == 'left_hemi':
-            mask = createSimpleMask(verts, .0, np.pi, -np.pi/2, np.pi/2)
+            mask = Mask.createSimpleMask(verts, .0, np.pi, -np.pi/2, np.pi/2)
 
         elif mask_type == 'left_lower_hemi':
-            mask = createSimpleMask(verts, .0, np.pi, -np.pi/2, .0)
+            mask = Mask.createSimpleMask(verts, .0, np.pi, -np.pi/2, .0)
 
         elif mask_type == 'right_hemi':
-            mask = createSimpleMask(verts, -np.pi, .0, -np.pi/2, .0)
+            mask = Mask.createSimpleMask(verts, -np.pi, .0, -np.pi/2, .0)
 
         elif mask_type == 'right_lower_hemi':
-            mask = createSimpleMask(verts, -np.pi, .0, -np.pi/2, .0)
+            mask = Mask.createSimpleMask(verts, -np.pi, .0, -np.pi/2, .0)
 
         ## Complex masks
         elif mask_type == 'translation_stripe_left':
             mask = np.zeros(verts.shape[0]).astype(bool)
             for m in mask_params[:-1]:
-                mask = mask | createHorizontalStripeMask(verts, np.pi/2, -m[0], m[1])
+                mask = mask | Mask.createHorizontalStripeMask(verts, np.pi/2, -m[0], m[1])
 
         elif mask_type == 'translation_stripe_right':
             mask = np.zeros(verts.shape[0]).astype(bool)
             for m in mask_params[:-1]:
-                mask = mask | createHorizontalStripeMask(verts, -np.pi/2, -m[0], m[1])
+                mask = mask | Mask.createHorizontalStripeMask(verts, -np.pi/2, -m[0], m[1])
 
         elif mask_type == 'translation_stripe_symmetric':
             mask = np.zeros(verts.shape[0]).astype(bool)
             for m in mask_params[:-1]:
-                mask = mask | createHorizontalStripeMask(verts, np.pi/2, -m[0], m[1])
-                mask = mask | createHorizontalStripeMask(verts, -np.pi/2, m[0], m[1])
+                mask = mask | Mask.createHorizontalStripeMask(verts, np.pi/2, -m[0], m[1])
+                mask = mask | Mask.createHorizontalStripeMask(verts, -np.pi/2, m[0], m[1])
 
         ## Additional masks
         elif mask_type[0] == 'vertical_stripe':
             pass
 
-        # Ass masked stimulus to final stimulus
+        # Add masked stimulus to final stimulus
         if mask is not None:
             if isinstance(mask_params, tuple):
                 stimulus[:,mask,:] = mask_params[-1][:, mask, :]
@@ -281,6 +286,8 @@ def createFragmentedTranslationStimulus(verts, whole_field = None, **masked_stim
 
 if __name__ == '__main__':
 
+    #####
+    ## Create sphere
     use_iso = True
     if use_iso:
         print('Using ISO sphere')
@@ -295,10 +302,13 @@ if __name__ == '__main__':
         md = gl.MeshData.sphere(rows=100, cols=200)
         verts = md.vertexes()
 
+
+    #####
+    ## Create patterns and use them to generate a translation stimulus
+    # TODO: this needs to be done automatically (from file or cmd arguments)
     # Create custom pattern
     pattern1 = Pattern.Bars(sf=2.)
     pattern2 = Pattern.Bars(sf=.7)
-
     # Create translation stimulus
     background = createTranslationStimulus(verts, pattern=pattern2, duration=20., v=.0)
     foreground = createTranslationStimulus(verts, pattern=pattern1, duration=20., v=1.)
@@ -314,6 +324,9 @@ if __name__ == '__main__':
     }
     stimulus = createFragmentedTranslationStimulus(md.vertexes(), **masks)
 
+
+    #####
+    ## Here follows the visualization part
     # Setup app and window
     app = QtWidgets.QApplication([])
     w = gl.GLViewWidget()
