@@ -140,6 +140,7 @@ class Pattern:
         color[:, :3] = np.repeat(c[:, np.newaxis], 3, axis=1)
         return color
 
+    ## Translational
     @staticmethod
     def Sinusoid(sf: float = 1.):
         def sinusoid(x: ndarray, t: float, **kwargs):
@@ -157,6 +158,13 @@ class Pattern:
             return Pattern._createGreyscale(c)
 
         return bars
+
+    ## Rotational
+    # TODO: try if rotational stimuli work like this.
+    # It's probably better though to rotate the sphere
+    # instead of trying to emulate rotation on the 2d canvas.
+    #   -> This would require an extra "createRotationStimulus" function similar to "createTranslationStimulus"
+    #      which recomputes the tex_coords for each frame
 
 
 class Mask:
@@ -201,11 +209,13 @@ def createTranslationStimulus(verts, v: float = 1., duration: float = 5., framet
                               pattern: object = None) -> ndarray:
     """Function creates a translation stimulus
 
+    :param verts: vertices that make up the sphere (2d ndarray)
     :param sf: spatial frequency of stimulus
     :param v: velocity of stimulus
     :param duration: duration of stimulus in [s]
     :param frametime: time per frame in [ms]
     :return:
+      stimulus frames as a whole_field representation on the sphere (3d ndarray)
 
     """
 
@@ -223,17 +233,32 @@ def createTranslationStimulus(verts, v: float = 1., duration: float = 5., framet
     for t in np.arange(.0, duration, frametime):
         stimulus.append(pattern(tex_coords[:,1], v*t, y=tex_coords[:,0]))
 
+    # Return stimulus frames
     return np.array(stimulus)
 
 
-def createFragmentedTranslationStimulus(verts, whole_field, **masked_stimuli):
+def applyMasks(verts, whole_field, *masked_stimuli):
+    """
+
+    :param verts: vertices that make up the sphere (2d ndarray)
+    :param whole_field: (background) whole field stimulus frames (3d ndarray)
+    :param masked_stimuli: dictionary of masks and corresponding stimulus frames
+     used to construct the final stimulus frames (mask_type = 3d ndarray)
+    :return:
+      final stimulus frames (3d ndarray)
+    """
 
     # Set background
     stimulus = whole_field
 
-    for mask_type in masked_stimuli:
+    # Overwrite background with masked stimuli
+    for newmask in masked_stimuli:
+        mask_type = newmask[0]
+        newstim = newmask[-1]
+
         print('Apply mask type "%s"' % mask_type)
-        mask_params = masked_stimuli[mask_type]
+        if len(newmask) > 2:
+            mask_params = newmask[1:-1]
 
         mask = None
 
@@ -252,116 +277,126 @@ def createFragmentedTranslationStimulus(verts, whole_field, **masked_stimuli):
 
         ## Complex masks
         elif mask_type == 'translation_stripe_left':
-            mask = np.zeros(verts.shape[0]).astype(bool)
-            for m in mask_params[:-1]:
-                mask = mask | Mask.createHorizontalStripeMask(verts, np.pi/2, -m[0], m[1])
+            mask = Mask.createHorizontalStripeMask(verts, np.pi/2, -mask_params[0], mask_params[1])
 
         elif mask_type == 'translation_stripe_right':
-            mask = np.zeros(verts.shape[0]).astype(bool)
-            for m in mask_params[:-1]:
-                mask = mask | Mask.createHorizontalStripeMask(verts, -np.pi/2, -m[0], m[1])
+            mask = Mask.createHorizontalStripeMask(verts, -np.pi/2, mask_params[0], mask_params[1])
 
         elif mask_type == 'translation_stripe_symmetric':
-            mask = np.zeros(verts.shape[0]).astype(bool)
-            for m in mask_params[:-1]:
-                mask = mask | Mask.createHorizontalStripeMask(verts, np.pi/2, -m[0], m[1])
-                mask = mask | Mask.createHorizontalStripeMask(verts, -np.pi/2, m[0], m[1])
+            mask = Mask.createHorizontalStripeMask(verts, np.pi/2, -mask_params[0], mask_params[1])
+            mask = mask | Mask.createHorizontalStripeMask(verts, -np.pi/2, mask_params[0], mask_params[1])
 
         ## Additional masks
         elif mask_type[0] == 'vertical_stripe':
             pass
 
-        # Add masked stimulus to final stimulus
+        # Add new masked stimulus to final stimulus
         if mask is not None:
-            if isinstance(mask_params, tuple):
-                stimulus[:,mask,:] = mask_params[-1][:, mask, :]
-            else:
-                stimulus[:,mask,:] = mask_params[:,mask,:]
+            stimulus[:,mask,:] = newstim[:,mask,:]
         else:
-            print('WARNING: no mask for type "%s"' % mask_type)
+            print('WARNING: no mask of type "%s"' % mask_type)
 
+    # Return final stimulus
     return stimulus
 
+
+class Stimulus:
+
+    def __init__(self, use_iso = True):
+
+        ## Create sphere vertices
+        if use_iso:
+            print('Using ISO sphere')
+            sphere = IcosahedronSphere(5)
+            self.verts = sphere.getVertices()
+            self.faces = sphere.getFaces()
+        else:
+            print('Using UV sphere')
+            # Create a sphere MeshData
+            md = gl.MeshData.sphere(rows=100, cols=200)
+            self.verts = md.vertexes()
+            self.faces = md.faces()
+
+        self.phases = list()
+        self.data = None
+
+
+    def addPhase(self, phase):
+        self.phases.append(phase)
+
+
+    def compile(self):
+        self.data = np.concatenate(self.phases, axis=0)
+
+
+    def display(self):
+
+        self.compile()
+
+        # Set MeshData
+        md = gl.MeshData()
+        md.setVertexes(self.verts)
+        md.setFaces(self.faces)
+
+        # Setup app and window
+        app = QtWidgets.QApplication([])
+        w = gl.GLViewWidget()
+        w.resize(QtCore.QSize(600, 600))
+        w.show()
+        w.setWindowTitle('Stimulus preview')
+        w.setCameraPosition(distance=3, azimuth=0)
+
+        # Create MeshItem
+        g = gl.GLGridItem()
+        w.addItem(g)
+        mi = gl.GLMeshItem(meshdata=md, smooth=True, glOptions='opaque')
+        w.addItem(mi)
+
+        # Define update function
+        self.dispIdx = 0
+        def update():
+
+            if self.dispIdx == self.data.shape[0]:
+                print('Stimulus presentation finished.')
+                index = -1
+
+            s = self.data[self.dispIdx]
+            s[(self.verts[:, 0] > .92) | (self.verts[:, 0] < -.92), :] = np.array([.0, .0, .0, 1.0])
+
+            md.setVertexColors(s)
+            mi.meshDataChanged()
+
+            self.dispIdx += 1
+
+        # Set timer for frame update
+        timer = QtCore.QTimer()
+        timer.timeout.connect(update)
+        timer.start(50)
+
+        # Start event loop
+        QtWidgets.QApplication.instance().exec_()
 
 
 if __name__ == '__main__':
 
-    #####
-    ## Create sphere
-    use_iso = True
-    if use_iso:
-        print('Using ISO sphere')
-        sphere = IcosahedronSphere(5)
-        verts = sphere.getVertices()
-        md = gl.MeshData()
-        md.setVertexes(verts)
-        md.setFaces(sphere.getFaces())
-    else:
-        print('Using UV sphere')
-        # Create a sphere MeshData
-        md = gl.MeshData.sphere(rows=100, cols=200)
-        verts = md.vertexes()
-
+    stim = Stimulus()
 
     #####
     ## Create patterns and use them to generate a translation stimulus
-    # TODO: this needs to be done automatically (from file or cmd arguments)
     # Create custom pattern
-    pattern1 = Pattern.Bars(sf=2.)
+    pattern1 = Pattern.Bars(sf=1.5)
     pattern2 = Pattern.Bars(sf=.7)
     # Create translation stimulus
-    background = createTranslationStimulus(verts, pattern=pattern2, duration=20., v=.0)
-    foreground = createTranslationStimulus(verts, pattern=pattern1, duration=20., v=1.)
 
-    masks = {
-        'whole_field': background,
-        #'right_lower_hemi' : foreground,
-        #'horizontal_stripe': foreground
-        #'translation_stripes_upper_left': foreground,
-        #'translation_stripes_upper_right': foreground
-        'translation_stripe_right': ([np.pi/4, np.pi/8], [-np.pi/4, np.pi/8], foreground),
-        #'translation_stripe_symmetric': ([np.pi/3, np.pi/8], foreground)
-    }
-    stimulus = createFragmentedTranslationStimulus(md.vertexes(), **masks)
+    for v in np.linspace(0.01, 2., 10):
+        background = createTranslationStimulus(stim.verts, pattern=pattern1, duration=2., v=.0)
+        foreground = createTranslationStimulus(stim.verts, pattern=pattern1, duration=2., v=v)
 
+        phase = applyMasks(stim.verts, background,
+                              ['translation_stripe_symmetric', np.pi/4, np.pi/6, foreground],
+                              #['translation_stripe_right', -np.pi/4, np.pi / 8, foreground]
+                              )
+        stim.addPhase(phase)
 
-    #####
-    ## Here follows the visualization part
-    # Setup app and window
-    app = QtWidgets.QApplication([])
-    w = gl.GLViewWidget()
-    w.resize(QtCore.QSize(600, 600))
-    w.show()
-    w.setWindowTitle('Stimulus preview')
-    w.setCameraPosition(distance=3, azimuth=0)
+    stim.display()
 
-    # Create MeshItem
-    g = gl.GLGridItem()
-    w.addItem(g)
-    mi = gl.GLMeshItem(meshdata=md, smooth=True, glOptions='opaque')
-    w.addItem(mi)
-
-    # Define update function
-    index = 0
-    def update():
-        global mi, index, stimulus
-
-        if index >= stimulus.shape[0]:
-            print('Resetting stimulus')
-            index = 0
-
-        s = stimulus[index]
-        s[(verts[:,0] > .92) | (verts[:,0] < -.92),:] = np.array([.0, .0, .0, 1.0])
-
-        md.setVertexColors(s)
-        mi.meshDataChanged()
-
-        index += 1
-
-    # Set timer for frame update
-    timer = QtCore.QTimer()
-    timer.timeout.connect(update)
-    timer.start(50)
-
-    # Start event loop
-    QtWidgets.QApplication.instance().exec_()
