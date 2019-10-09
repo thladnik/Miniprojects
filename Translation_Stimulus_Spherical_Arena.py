@@ -3,10 +3,10 @@
 
 # Author Tim Hladnik
 
-import argparse
 import numpy as np
 from numpy import ndarray
 from scipy.spatial.transform import Rotation
+import sys
 
 # Visualization
 from PyQt5 import QtCore, QtWidgets
@@ -164,7 +164,7 @@ class Pattern:
     # It's probably better though to rotate the sphere
     # instead of trying to emulate rotation on the 2d canvas.
     #   -> This would require an extra "createRotationStimulus" function similar to "createTranslationStimulus"
-    #      which recomputes the tex_coords for each frame
+    #      which rotates the vertices and recomputes the tex_coords for each frame
 
 
 class Mask:
@@ -202,6 +202,7 @@ class Mask:
         mask = np.zeros(verts.shape[0]).astype(bool)
         mask[(theta_center - np.pi / 2 < theta) & (theta < theta_center + np.pi / 2)
              & (-phi_thresh < phi) & (phi < +phi_thresh)] = True
+
         return mask
 
 
@@ -238,7 +239,18 @@ def createTranslationStimulus(verts, v: float = 1., duration: float = 5., framet
 
 
 def applyMasks(verts, whole_field, *masked_stimuli):
-    """
+    """Applies a set of predefined masks with the specified stimuli.
+
+      Simple masks do not take any mask parameters. Possible types so far are:
+        > left_hemi         : left hemisphere
+        > left_lower_hemi   : lower left hemisphere
+        > right_hemi        : right hemisphere
+        > right_lower_hemi  : lower right hemisphere
+
+      Complex masks do take mask parameters. Possible types so far are:
+        > transl_stripe_left   : an oval-like mask spanning horizontally from front to back
+        > transl_stripe_right  : an oval-like mask spanning horizontally from front to back
+        > transl_stripes_symm  : two oval-like masks spanning horizontally from front to back
 
     :param verts: vertices that make up the sphere (2d ndarray)
     :param whole_field: (background) whole field stimulus frames (3d ndarray)
@@ -276,13 +288,13 @@ def applyMasks(verts, whole_field, *masked_stimuli):
             mask = Mask.createSimpleMask(verts, -np.pi, .0, -np.pi/2, .0)
 
         ## Complex masks
-        elif mask_type == 'translation_stripe_left':
+        elif mask_type == 'transl_stripe_left':
             mask = Mask.createHorizontalStripeMask(verts, np.pi/2, -mask_params[0], mask_params[1])
 
-        elif mask_type == 'translation_stripe_right':
+        elif mask_type == 'transl_stripe_right':
             mask = Mask.createHorizontalStripeMask(verts, -np.pi/2, mask_params[0], mask_params[1])
 
-        elif mask_type == 'translation_stripe_symmetric':
+        elif mask_type == 'transl_stripe_symm':
             mask = Mask.createHorizontalStripeMask(verts, np.pi/2, -mask_params[0], mask_params[1])
             mask = mask | Mask.createHorizontalStripeMask(verts, -np.pi/2, mask_params[0], mask_params[1])
 
@@ -307,7 +319,7 @@ class Stimulus:
         ## Create sphere vertices
         if use_iso:
             print('Using ISO sphere')
-            sphere = IcosahedronSphere(5)
+            sphere = IcosahedronSphere(6)
             self.verts = sphere.getVertices()
             self.faces = sphere.getFaces()
         else:
@@ -329,7 +341,7 @@ class Stimulus:
         self.data = np.concatenate(self.phases, axis=0)
 
 
-    def display(self):
+    def display(self, frametime):
 
         self.compile()
 
@@ -358,7 +370,9 @@ class Stimulus:
 
             if self.dispIdx == self.data.shape[0]:
                 print('Stimulus presentation finished.')
-                index = -1
+                self.dispIdx = -1
+                timer.stop()
+                w.close()
 
             s = self.data[self.dispIdx]
             s[(self.verts[:, 0] > .92) | (self.verts[:, 0] < -.92), :] = np.array([.0, .0, .0, 1.0])
@@ -371,7 +385,7 @@ class Stimulus:
         # Set timer for frame update
         timer = QtCore.QTimer()
         timer.timeout.connect(update)
-        timer.start(50)
+        timer.start(1000*frametime)
 
         # Start event loop
         QtWidgets.QApplication.instance().exec_()
@@ -379,24 +393,52 @@ class Stimulus:
 
 if __name__ == '__main__':
 
-    stim = Stimulus()
+    if 'example01' in sys.argv:
 
-    #####
-    ## Create patterns and use them to generate a translation stimulus
-    # Create custom pattern
-    pattern1 = Pattern.Bars(sf=1.5)
-    pattern2 = Pattern.Bars(sf=.7)
-    # Create translation stimulus
+        frametime = .05
 
-    for v in np.linspace(0.01, 2., 10):
-        background = createTranslationStimulus(stim.verts, pattern=pattern1, duration=2., v=.0)
-        foreground = createTranslationStimulus(stim.verts, pattern=pattern1, duration=2., v=v)
+        stim = Stimulus()
 
-        phase = applyMasks(stim.verts, background,
-                              ['translation_stripe_symmetric', np.pi/4, np.pi/6, foreground],
-                              #['translation_stripe_right', -np.pi/4, np.pi / 8, foreground]
-                              )
-        stim.addPhase(phase)
+        # Create a pattern
+        pattern = Pattern.Bars(sf=1.5)
 
-    stim.display()
+        # Create translation stimuli
+        for v in np.linspace(0.05, 1., 10):
+            background = createTranslationStimulus(stim.verts,
+                                                   pattern=pattern, duration=5., v=.0, frametime=frametime)
+            pos_transl = createTranslationStimulus(stim.verts,
+                                                   pattern=pattern, duration=5., v=v, frametime=frametime)
+            neg_transl = createTranslationStimulus(stim.verts,
+                                                   pattern=pattern, duration=5., v=-v, frametime=frametime)
+
+            phase = applyMasks(stim.verts, background,
+                               ['transl_stripe_symm', np.pi / 4, np.pi / 4, pos_transl],
+                               ['transl_stripe_symm', -np.pi / 4, np.pi / 4, neg_transl],
+                               )
+            stim.addPhase(phase)
+
+        stim.display(frametime)
+
+    elif 'example02' in sys.argv:
+
+        frametime = .05
+
+        stim = Stimulus()
+
+        # Create a pattern
+        pattern = Pattern.Bars(sf=1.5)
+
+        # Create translation stimuli
+        for v in np.linspace(0.05, 1., 10):
+            background = createTranslationStimulus(stim.verts,
+                                                   pattern=pattern, duration=1., v=.0, frametime=frametime)
+            pos_transl = createTranslationStimulus(stim.verts,
+                                                   pattern=pattern, duration=5., v=v, frametime=frametime)
+
+            phase = applyMasks(stim.verts, background,
+                               ['left_hemi', np.pi / 4, np.pi / 4, pos_transl],
+                               )
+            stim.addPhase(phase)
+
+        stim.display(frametime)
 
