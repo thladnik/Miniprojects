@@ -3,7 +3,7 @@
 
 # Author Tim Hladnik
 
-Dev = True
+Dev = False
 
 import numpy as np
 from numpy import ndarray
