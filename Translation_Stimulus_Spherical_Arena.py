@@ -3,7 +3,7 @@
 
 # Author Tim Hladnik
 
-Dev = False
+Dev = True
 
 import numpy as np
 from numpy import ndarray
@@ -218,8 +218,8 @@ def createTranslationStimulus(verts, v: float = 1., duration: float = 5., framet
     """Function creates a translation stimulus
 
     :param verts: vertices that make up the sphere (2d ndarray)
-    :param sf: approx. LOWEST spatial frequency of stimulus in [cyc/deg]
-    :param v: approx. LOWEST velocity of stimulus in [deg/s]
+    :param sf: approx. spatial frequency of stimulus in [cyc/deg]
+    :param v: approx. velocity of stimulus in [deg/s]
     :param duration: duration of stimulus in [s]
     :param frametime: time per frame in [ms]
     :return:
@@ -325,31 +325,31 @@ def applyMasks(verts, whole_field, *masked_stimuli):
 
 class Stimulus:
 
-    def __init__(self, use_iso = True):
+    def __init__(self, use_iso = False):
 
-        ## Create sphere vertices
+        # Create sphere
         if use_iso:
             print('Using ISO sphere')
             sphere = IcosahedronSphere(5)
             self.verts = sphere.getVertices()
             self.faces = sphere.getFaces()
         else:
-            print('Using UV sphere')
-            md = gl.MeshData.sphere(rows=100, cols=200)
-            self.verts = md.vertexes()
-            self.faces = md.faces()
+            print('Using spherical LED arena coordinates')
+            from h5py import File
+            from scipy.spatial import Delaunay
+
+            with File('SphericalArena_LED_Coords.h5', 'r') as f:
+                self.verts = f['vertices'][:]
+                self.faces = f['faces'][:]
 
         self.phases = list()
         self.data = None
 
-
     def addPhase(self, phase):
         self.phases.append(phase)
 
-
     def compile(self):
         self.data = np.concatenate(self.phases, axis=0)
-
 
     def saveAs(self, filename, ext='mat'):
         self.compile()
@@ -357,7 +357,6 @@ class Stimulus:
         composed = dict(vertices=self.verts, stimulus=self.data[:,:,0])  # only save greyscale
         if ext == 'mat':
             savemat('%s.%s' % (filename, ext), composed)
-
 
     def display(self, frametime):
         self.compile()

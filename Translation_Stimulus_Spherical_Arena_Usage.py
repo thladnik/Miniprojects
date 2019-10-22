@@ -17,7 +17,7 @@ for sf in np.linspace(1./180, 5./180, 5):
     # Create a pattern
     pattern = Pattern.Bars(sf=sf)
 
-    for v in np.linspace(.1, 1., 5):
+    for v in np.linspace(.1, 1., 2):
 
         background = createTranslationStimulus(stim.verts,
                                                pattern=pattern, duration=dur, v=.0, frametime=frametime)
@@ -34,4 +34,4 @@ for sf in np.linspace(1./180, 5./180, 5):
 
 stim.display(frametime)
 
-stim.saveAs('example01')
+#stim.saveAs('example01')
