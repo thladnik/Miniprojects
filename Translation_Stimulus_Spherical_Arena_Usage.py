@@ -13,12 +13,11 @@ stim = Stimulus()
 
 # Create translation stimuli for different spatial frequencies and velocities
 for sf in np.linspace(1./180, 5./180, 5):
-
     # Create a pattern
     pattern = Pattern.Bars(sf=sf)
 
     # Use multiple test velocities
-    for v in np.linspace(.1, 1., 2):
+    for v in np.linspace(1., 45., 4):
 
         # whole_field stimulus
         background = createTranslationStimulus(stim.verts,

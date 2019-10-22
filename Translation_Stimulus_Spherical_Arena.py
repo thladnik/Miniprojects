@@ -148,7 +148,7 @@ class Pattern:
     @staticmethod
     def Sinusoid(sf: float = 1.):
         def sinusoid(x: ndarray, shift: float, return_rgba: bool=True, **kwargs):
-            c = np.cos(180 * sf * np.pi * x + shift)
+            c = np.cos(180 * sf * np.pi * (x + np.pi * shift / 180))
             if return_rgba:
                 return Pattern._createGreyscaleRGBA(c)
             return c
@@ -172,7 +172,6 @@ class Pattern:
     # instead of trying to emulate rotation on the 2d canvas.
     #   -> This would require an extra "createRotationStimulus" function similar to "createTranslationStimulus"
     #      which rotates the vertices and recomputes the tex_coords for each frame
-
 
 class Mask:
 
@@ -212,7 +211,6 @@ class Mask:
 
         return mask
 
-
 def createTranslationStimulus(verts, v: float = 1., duration: float = 5., frametime: float = .05,
                               pattern: object = None) -> ndarray:
     """Function creates a translation stimulus
@@ -221,10 +219,9 @@ def createTranslationStimulus(verts, v: float = 1., duration: float = 5., framet
     :param sf: approx. spatial frequency of stimulus in [cyc/deg]
     :param v: approx. velocity of stimulus in [deg/s]
     :param duration: duration of stimulus in [s]
-    :param frametime: time per frame in [ms]
+    :param frametime: time per frame in [s]
     :return:
       stimulus frames as a whole_field representation on the sphere (3d ndarray)
-
     """
 
     # Calculate azimuth and elevation from cartesian coordinates
@@ -244,27 +241,26 @@ def createTranslationStimulus(verts, v: float = 1., duration: float = 5., framet
     # Return stimulus frames
     return np.array(stimulus)
 
-
 def applyMasks(verts, whole_field, *masked_stimuli):
     """Applies a set of predefined masks with the specified stimuli.
 
-      Simple masks do not take any mask parameters. Possible types so far are:
-        > left_hemi         : left hemisphere
-        > left_lower_hemi   : lower left hemisphere
-        > right_hemi        : right hemisphere
-        > right_lower_hemi  : lower right hemisphere
-
-      Complex masks do take mask parameters. Possible types so far are:
-        > transl_stripe_left   : an oval-like mask spanning horizontally from front to back
-        > transl_stripe_right  : an oval-like mask spanning horizontally from front to back
-        > transl_stripes_symm  : two oval-like masks spanning horizontally from front to back
-
     :param verts: vertices that make up the sphere (2d ndarray)
     :param whole_field: (background) whole field stimulus frames (3d ndarray)
-    :param masked_stimuli: list of mask_types, mask parameters and corresponding stimulus frames
+    :param masked_stimuli: lists of mask_types, mask parameters and corresponding stimulus frames
      used to construct the final stimulus frames
     :return:
       final stimulus frames (3d ndarray)
+
+    Simple masks do not take any mask parameters. Possible types so far are:
+      > left_hemi         : left hemisphere
+      > left_lower_hemi   : lower left hemisphere
+      > right_hemi        : right hemisphere
+      > right_lower_hemi  : lower right hemisphere
+
+    Complex masks do take mask parameters. Possible types so far are:
+      > transl_stripe_left   : an oval-like mask spanning horizontally from front to back
+      > transl_stripe_right  : an oval-like mask spanning horizontally from front to back
+      > transl_stripes_symm  : two oval-like masks spanning horizontally from front to back
     """
 
     # Set background
