@@ -118,6 +118,8 @@ class IcosahedronSphere:
         return np.array(self.faces)
 
 
+IPython.embed()
+
 class Helper:
 
     @staticmethod

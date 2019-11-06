@@ -7,7 +7,7 @@
 Calculate a 3d to 2d projection of a cube for different camera positions and display distances.
 """
 
-from mpl_toolkits.mplot3d import Axes3Dc
+from mpl_toolkits.mplot3d import Axes3D
 import matplotlib
 matplotlib.use('qt5agg')
 import matplotlib.pyplot as plt
