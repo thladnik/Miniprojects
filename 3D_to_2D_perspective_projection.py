@@ -59,7 +59,9 @@ if __name__ == '__main__':
     for i in range(faces.shape[0]):
         faces_conn[i, :] = np.append(faces[i, :], faces[i, 0])
 
-    camera_angles = np.array([-np.pi/2, 0., 0.])
+    #camera_angles = np.array([-np.pi/2, 0., 0.])
+    #camera_angles = np.array([-np.pi/4, 0., 0.])
+    camera_angles = np.array([-2.5*np.pi/4, 0., 0.])
 
     ## Create plots
     fig3d = plt.figure()

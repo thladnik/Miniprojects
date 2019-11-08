@@ -138,7 +138,19 @@ window = app.Window(width=800, height=800, color=(1, 1, 1, 1))
 
 
 @window.event
-def on_resize(height, width):
+def on_resize(width, height):
+
+    # Update viewport (center local viewport with aspect = 1)
+    if height > width:
+        length = width
+        x_offset = 0
+        y_offset = (height - length) // 2
+    else:
+        length = height
+        x_offset = (width - length) // 2
+        y_offset = 0
+    program['viewport']['global'] = (0, 0, width, height)
+    program['viewport']['local'] = (x_offset, y_offset, length, length)
 
     std_trans_distance = -10.
     std_fov = 30.
@@ -149,7 +161,6 @@ def on_resize(height, width):
     azimuth_rot_se = 0.
     azimuth_rot_ne = 0.
     azimuth_rot_nw = 0.
-
 
     ## SOUTH WEST
     # Non-linear transformations
@@ -216,97 +227,39 @@ all_sph_pos = sphere.getSphericalCoords()
 
 ### BUILD SEGMENTED SPHERE
 
-if True:
-    orientations = ['sw', 'se', 'ne', 'nw']
-    verts = dict()
-    faces = dict()
-    sph_pos = dict()
-    channel = dict()
-    for i, orient in enumerate(orientations):
-        theta_center = -3*np.pi/4 + i * np.pi/2
-        vert_mask = SphereHelper.getAzElLimitedMask(theta_center-np.pi/4, theta_center+np.pi/4,
-                                                    -np.inf, np.inf, all_verts)
+orientations = ['sw', 'se', 'ne', 'nw']
+verts = dict()
+faces = dict()
+sph_pos = dict()
+channel = dict()
+for i, orient in enumerate(orientations):
+    theta_center = -3*np.pi/4 + i * np.pi/2
+    vert_mask = SphereHelper.getAzElLimitedMask(theta_center-np.pi/4, theta_center+np.pi/4,
+                                                -np.inf, np.inf, all_verts)
 
-        verts[orient] = all_verts[vert_mask]
-        sph_pos[orient] = all_sph_pos[vert_mask]
-        channel[orient] = (i+1) * np.ones((verts[orient].shape[0], 2))
-        faces[orient] = Delaunay(verts[orient]).convex_hull
+    verts[orient] = all_verts[vert_mask]
+    sph_pos[orient] = all_sph_pos[vert_mask]
+    channel[orient] = (i+1) * np.ones((verts[orient].shape[0], 2))
+    faces[orient] = Delaunay(verts[orient]).convex_hull
 
-    ## CREATE BUFFERS
-    v = np.concatenate([verts[orient] for orient in orientations], axis=0)
-    # Vertex buffer
-    vertices = np.zeros(v.shape[0],
-                        [('a_cart_pos', np.float32, 3),
-                         ('a_sph_pos', np.float32, 2),
-                         ('a_channel', np.float32, 2)])
-    vertices['a_cart_pos'] = v.astype(np.float32)
-    vertices['a_sph_pos'] = np.concatenate([sph_pos[orient] for orient in orientations], axis=0).astype(np.float32)
-    vertices['a_channel'] = np.concatenate([channel[orient] for orient in orientations], axis=0).astype(np.float32)
-    vertices = vertices.view(gloo.VertexBuffer)
-    # Index buffer
-    indices = np.zeros((0, 3))
-    startidx = 0
-    for orient in orientations:
-        indices = np.concatenate([indices, startidx+faces[orient]], axis=0)
-        startidx += verts[orient].shape[0]
-    indices = indices.astype(np.uint32).view(gloo.IndexBuffer)
-
-else:
-    ## SOUTH WEST
-    # Get mask for azimuth-elevation subset
-    vert_mask = SphereHelper.getAzElLimitedMask(-np.pi, -np.pi/2, -np.inf, np.inf, all_verts)
-    # Select vertex subset and corresponding faces
-    verts = all_verts[vert_mask]
-    sph_pos = all_sph_pos[vert_mask]
-    channel = np.ones((verts.shape[0], 2))
-    faces = Delaunay(verts).convex_hull
-
-    ## SOUTH EAST
-    startidx = verts.shape[0]
-    # Get mask for azimuth-elevation subset
-    vert_mask = SphereHelper.getAzElLimitedMask(-np.pi/2, 0., -np.inf, np.inf, all_verts)
-    # Select vertex subset and corresponding faces
-    newverts = all_verts[vert_mask]
-    verts = np.concatenate([verts, newverts], axis=0)
-    sph_pos = np.concatenate([sph_pos, all_sph_pos[vert_mask]], axis=0)
-    channel = np.concatenate([channel, 2 * np.ones((newverts.shape[0], 2))], axis=0)
-    faces = np.concatenate([faces, startidx+Delaunay(newverts).convex_hull], axis=0)
-
-    ## NORTH EAST
-    startidx = verts.shape[0]
-    # Get mask for azimuth-elevation subset
-    vert_mask = SphereHelper.getAzElLimitedMask(0., np.pi/2, -np.inf, np.inf, all_verts)
-    # Select vertex subset and corresponding faces
-    newverts = all_verts[vert_mask]
-    verts = np.concatenate([verts, newverts], axis=0)
-    sph_pos = np.concatenate([sph_pos, all_sph_pos[vert_mask]], axis=0)
-    channel = np.concatenate([channel, 3 * np.ones((newverts.shape[0], 2))], axis=0)
-    faces = np.concatenate([faces, startidx+Delaunay(newverts).convex_hull], axis=0)
-
-    ## NORTH WEST
-    startidx = verts.shape[0]
-    # Get mask for azimuth-elevation subset
-    vert_mask = SphereHelper.getAzElLimitedMask(np.pi/2, np.pi, -np.inf, np.inf, all_verts)
-    # Select vertex subset and corresponding faces
-    newverts = all_verts[vert_mask]
-    verts = np.concatenate([verts, newverts], axis=0)
-    sph_pos = np.concatenate([sph_pos, all_sph_pos[vert_mask]], axis=0)
-    channel = np.concatenate([channel, 4 * np.ones((newverts.shape[0], 2))], axis=0)
-    faces = np.concatenate([faces, startidx+Delaunay(newverts).convex_hull], axis=0)
-
-    ## CREATE BUFFERS
-    vertices = np.zeros(verts.shape[0],
-                        [('a_cart_pos', np.float32, 3),
-                        ('a_sph_pos', np.float32, 2),
-                         ('a_channel', np.float32, 2)])
-    vertices['a_cart_pos'] = verts.astype(np.float32)
-    vertices['a_sph_pos'] = sph_pos.astype(np.float32)
-    vertices['a_channel'] = channel.astype(np.float32)
-    vertices = vertices.view(gloo.VertexBuffer)
-
-    faces = np.array(faces)
-    indices = faces.astype(np.uint32)
-    indices = indices.view(gloo.IndexBuffer)
+## CREATE BUFFERS
+v = np.concatenate([verts[orient] for orient in orientations], axis=0)
+# Vertex buffer
+vertices = np.zeros(v.shape[0],
+                    [('a_cart_pos', np.float32, 3),
+                     ('a_sph_pos', np.float32, 2),
+                     ('a_channel', np.float32, 2)])
+vertices['a_cart_pos'] = v.astype(np.float32)
+vertices['a_sph_pos'] = np.concatenate([sph_pos[orient] for orient in orientations], axis=0).astype(np.float32)
+vertices['a_channel'] = np.concatenate([channel[orient] for orient in orientations], axis=0).astype(np.float32)
+vertices = vertices.view(gloo.VertexBuffer)
+# Index buffer
+indices = np.zeros((0, 3))
+startidx = 0
+for orient in orientations:
+    indices = np.concatenate([indices, startidx+faces[orient]], axis=0)
+    startidx += verts[orient].shape[0]
+indices = indices.astype(np.uint32).view(gloo.IndexBuffer)
 
 ## CREATE PROGRAM
 program = gloo.Program(vertex_shader, fragment_shader)
