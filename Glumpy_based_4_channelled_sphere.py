@@ -14,24 +14,28 @@ vertex_shader = """
     uniform mat4   u_trans_sw;   
     uniform mat4   u_projection_sw;
     uniform float  u_radial_offset_sw;
+    uniform float  u_tangent_offset_sw;
     
     // Transforms SOUTH EAST
     uniform mat4   u_rot_se;
     uniform mat4   u_trans_se;
     uniform mat4   u_projection_se;
     uniform float  u_radial_offset_se;
+    uniform float  u_tangent_offset_se;
     
     // Transforms NORTH EAST
     uniform mat4   u_rot_ne;
     uniform mat4   u_trans_ne;
     uniform mat4   u_projection_ne;
     uniform float  u_radial_offset_ne;
+    uniform float  u_tangent_offset_ne;
     
     // Transforms NORTH WEST
     uniform mat4   u_rot_nw;
     uniform mat4   u_trans_nw;
     uniform mat4   u_projection_nw;
     uniform float  u_radial_offset_nw;
+    uniform float  u_tangent_offset_nw;
     
     // Vertex attributes
     attribute vec3 a_cart_pos;      // Cartesian vertex position
@@ -47,9 +51,13 @@ vertex_shader = """
         // SOUTH WEST
         if (a_channel == 1) {
             // First: non-linear projection
-            vec4 pos = u_projection_sw * u_trans_sw * u_rot_sw * vec4(a_cart_pos, 1.0);
-            // Second: linear transformations in image plane (shifting/scaling/rotating 2d image)
+            vec4 pos =  u_projection_sw * u_trans_sw * u_rot_sw * vec4(a_cart_pos, 1.0);
+            //// Second: linear transformations in image plane (shifting/scaling/rotating 2d image)
+            // Radial offset
             pos.xy -= u_radial_offset_sw * pos.w;
+            // Rangential offset
+            pos.x += u_tangent_offset_sw * pos.w;
+            pos.y -= u_tangent_offset_sw * pos.w;
             // Last: return position for vertex
             return pos;
         }
@@ -57,10 +65,12 @@ vertex_shader = """
         else if (a_channel == 2) {
            // First: non-linear projection
             vec4 pos = u_projection_se * u_trans_se * u_rot_se * vec4(a_cart_pos, 1.0);
-            // Second: linear transformations in image plane (shifting/scaling/rotating 2d image)
-            //pos = vec4(pos.x + u_radial_offset_se, pos.y - u_radial_offset_se, pos.z, pos.w);
+            //// Second: linear transformations in image plane (shifting/scaling/rotating 2d image)
+            // Radial offset
             pos.x += u_radial_offset_se * pos.w;
             pos.y -= u_radial_offset_se * pos.w;
+            // Tangential offset
+            pos.xy += u_tangent_offset_se * pos.w;
             // Last: return position for vertex
             return pos;
         }
@@ -68,9 +78,12 @@ vertex_shader = """
         else if (a_channel == 3) {
            // First: non-linear projection
             vec4 pos = u_projection_ne * u_trans_ne * u_rot_ne * vec4(a_cart_pos, 1.0);
-            // Second: linear transformations in image plane (shifting/scaling/rotating 2d image)
-            //pos = vec4(pos.x + u_radial_offset_ne, pos.y + u_radial_offset_ne, pos.z, pos.w);
+            //// Second: linear transformations in image plane (shifting/scaling/rotating 2d image)
+            // Radial offset
             pos.xy += u_radial_offset_ne * pos.w;
+            // Tangential offset
+            pos.x -= u_tangent_offset_ne * pos.w;
+            pos.y += u_tangent_offset_ne * pos.w;
             // Last: return position for vertex
             return pos;
         }
@@ -78,10 +91,12 @@ vertex_shader = """
         else if (a_channel == 4) {
            // First: non-linear projection
             vec4 pos = u_projection_nw * u_trans_nw * u_rot_nw * vec4(a_cart_pos, 1.0);
-            // Second: linear transformations in image plane (shifting/scaling/rotating 2d image)
-            //pos = vec4(pos.x - u_radial_offset_nw, pos.y + u_radial_offset_nw, pos.z, pos.w);
+            //// Second: linear transformations in image plane (shifting/scaling/rotating 2d image)
+            // Radial offset
             pos.x -= u_radial_offset_nw * pos.w;
             pos.y += u_radial_offset_nw * pos.w;
+            // Tangential offset
+            pos.xy -= u_tangent_offset_nw * pos.w;
             // Last: return position for vertex
             return pos;
         }
@@ -140,7 +155,7 @@ window = app.Window(width=800, height=800, color=(1, 1, 1, 1))
 @window.event
 def on_resize(width, height):
 
-    # Update viewport (center local viewport with aspect = 1)
+    ## Update viewport (center local viewport with aspect = 1)
     if height > width:
         length = width
         x_offset = 0
@@ -152,10 +167,17 @@ def on_resize(width, height):
     program['viewport']['global'] = (0, 0, width, height)
     program['viewport']['local'] = (x_offset, y_offset, length, length)
 
+    ## Set default image channel parameters
     std_trans_distance = -10.
     std_fov = 30.
-    std_azimuth_rot = 90.
+    std_elevation_rot = 90.
     std_radial_offset = 0.5
+    std_tangent_offset = 0.2
+
+    elevation_rot_sw = 0.
+    elevation_rot_se = 0.
+    elevation_rot_ne = 0.
+    elevation_rot_nw = 0.
 
     azimuth_rot_sw = 0.
     azimuth_rot_se = 0.
@@ -165,50 +187,58 @@ def on_resize(width, height):
     ## SOUTH WEST
     # Non-linear transformations
     rot_axis_sw = (-1, 1, 0)
-    u_projection = glm.perspective(std_fov, 1.0, 0.01, 100.0)
+    u_projection = glm.perspective(std_fov, 1.0, 0.01, 1000.0)
     u_rot = np.eye(4, dtype=np.float32)
-    glm.rotate(u_rot, std_azimuth_rot-azimuth_rot_sw, *rot_axis_sw)
+    glm.rotate(u_rot, azimuth_rot_sw, 0, 0, 1)  # Rotate around equator
+    glm.rotate(u_rot, std_elevation_rot-elevation_rot_sw, *rot_axis_sw)  # Rotate around current azim. major circle
     u_trans = glm.translation(0., 0., std_trans_distance)
     program['u_trans_sw'] = u_trans
     program['u_rot_sw'] = u_rot
     program['u_projection_sw'] = u_projection
     # Linear image plane transformations
     program['u_radial_offset_sw'] = std_radial_offset
+    program['u_tangent_offset_sw'] = std_tangent_offset
 
     ## SOUTH EAST
     # Non-linear transformations
     rot_axis_se = (-1, -1, 0)
-    u_projection = glm.perspective(std_fov, 1.0, 0.01, 100.0)
+    u_projection = glm.perspective(std_fov, 1.0, 0.01, 1000.0)
     u_rot = np.eye(4, dtype=np.float32)
-    glm.rotate(u_rot, std_azimuth_rot-azimuth_rot_se, *rot_axis_se)
+    glm.rotate(u_rot, azimuth_rot_se, 0, 0, 1)  # Rotate around equator
+    glm.rotate(u_rot, std_elevation_rot-elevation_rot_se, *rot_axis_se)  # Rotate around current azim. major circle
     u_trans = glm.translation(0., 0., std_trans_distance)
     program['u_trans_se'] = u_trans
     program['u_rot_se'] = u_rot
     program['u_projection_se'] = u_projection
     # Linear image plane transformations
     program['u_radial_offset_se'] = std_radial_offset
+    program['u_tangent_offset_se'] = std_tangent_offset
 
     rot_axis_ne = (1, -1, 0)
-    u_projection = glm.perspective(std_fov, 1.0, 0.01, 100.0)
+    u_projection = glm.perspective(std_fov, 1.0, 0.01, 1000.0)
     u_rot = np.eye(4, dtype=np.float32)
-    glm.rotate(u_rot, std_azimuth_rot-azimuth_rot_ne, *rot_axis_ne)
+    glm.rotate(u_rot, azimuth_rot_ne, 0, 0, 1)  # Rotate around equator
+    glm.rotate(u_rot, std_elevation_rot-elevation_rot_ne, *rot_axis_ne)  # Rotate around current azim. major circle
     u_trans = glm.translation(0., 0., std_trans_distance)
     program['u_trans_ne'] = u_trans
     program['u_rot_ne'] = u_rot
     program['u_projection_ne'] = u_projection
     # Linear image plane transformations
     program['u_radial_offset_ne'] = std_radial_offset
+    program['u_tangent_offset_ne'] = std_tangent_offset
 
     rot_axis_nw = (1, 1, 0)
-    u_projection = glm.perspective(std_fov, 1.0, 0.01, 100.0)
+    u_projection = glm.perspective(std_fov, 1.0, 0.01, 1000.0)
     u_rot = np.eye(4, dtype=np.float32)
-    glm.rotate(u_rot, std_azimuth_rot-azimuth_rot_nw, *rot_axis_nw)
+    glm.rotate(u_rot, azimuth_rot_nw, 0, 0, 1)  # Rotate around equator
+    glm.rotate(u_rot, std_elevation_rot-elevation_rot_nw, *rot_axis_nw)  # Rotate around current azim. major circle
     u_trans = glm.translation(0., 0., std_trans_distance)
     program['u_trans_nw'] = u_trans
     program['u_rot_nw'] = u_rot
     program['u_projection_nw'] = u_projection
     # Linear image plane transformations
     program['u_radial_offset_nw'] = std_radial_offset
+    program['u_tangent_offset_nw'] = std_tangent_offset
 
 @window.event
 def on_draw(dt):
