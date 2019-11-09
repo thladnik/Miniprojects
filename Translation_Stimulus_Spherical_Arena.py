@@ -118,8 +118,6 @@ class IcosahedronSphere:
         return np.array(self.faces)
 
 
-IPython.embed()
-
 class Helper:
 
     @staticmethod
@@ -159,6 +157,13 @@ class Pattern:
 
     @staticmethod
     def Bars(sf: float = 1.):
+        """Create a black-and-white bar pattern
+
+        :param sf: spatial frequency of stimulus in [cyc/deg]
+        :return:
+          bars func object
+        """
+
         def bars(x: ndarray, shift: float, return_rgba=True, **kwargs):
             c = Pattern.Sinusoid(sf)(x, shift, return_rgba=False, **kwargs)
             c[c >= .0] = 1.
@@ -214,20 +219,33 @@ class Mask:
         return mask
 
 def createTranslationStimulus(verts, v: float = 1., duration: float = 5., frametime: float = .05,
-                              pattern: object = None) -> ndarray:
-    """Function creates a translation stimulus
+                              pattern: object = None, movement_dir: str = 'horizontal') -> ndarray:
+    """Function creates a translation stimulus.
+
+    Because of the cylindrical projection, stimulus velocities are not constant across the sphere.
+    Instead they decrease with distance from the plane which is perpendicular to stimulus movement direction.
+    Therefore stimulus velocity v represents the approx. maximum velocity at points in this perpendicular plane.
+
+    The same applies for the spatial frequencies of stimulus patterns.
+    I.e. the set spatial frequencies represent the approx. lowest spatial at points in the perpendicular plane.
 
     :param verts: vertices that make up the sphere (2d ndarray)
-    :param sf: approx. spatial frequency of stimulus in [cyc/deg]
-    :param v: approx. velocity of stimulus in [deg/s]
+    :param v: approx. maximum velocity of stimulus in [deg/s]
     :param duration: duration of stimulus in [s]
     :param frametime: time per frame in [s]
+    :param pattern: function object which returns a 1d or 2d pattern
     :return:
       stimulus frames as a whole_field representation on the sphere (3d ndarray)
     """
 
     # Calculate azimuth and elevation from cartesian coordinates
-    theta, phi, _ = Helper.cart2sph(verts[:, 1], verts[:, 2], verts[:, 0])
+    if movement_dir == 'horizontal':
+        theta, phi, _ = Helper.cart2sph(verts[:, 1], verts[:, 2], verts[:, 0])
+    elif movement_dir == 'vertical':
+        theta, phi, _ = Helper.cart2sph(verts[:, 0], verts[:, 1], verts[:, 2])
+    else:
+        raise Exception('Invalid movement direction for translation stimulus.')
+
     # Calculate central projection on cylinder
     tex_coords = np.array(Helper.centralCylindrical2DTexture(theta, phi)).T
 
@@ -238,7 +256,8 @@ def createTranslationStimulus(verts, v: float = 1., duration: float = 5., framet
     # Construct stimulus frames
     stimulus = list()
     for t in np.arange(.0, duration, frametime):
-        stimulus.append(pattern(tex_coords[:,1], v*t, y=tex_coords[:,0]))
+        #stimulus.append(pattern(tex_coords[:,1], v*t, y=tex_coords[:,0]))
+        stimulus.append(pattern(tex_coords[:, 1], v * t, y=tex_coords[:, 0]))
 
     # Return stimulus frames
     return np.array(stimulus)
@@ -291,6 +310,84 @@ def applyMasks(verts, whole_field, *masked_stimuli):
 
         elif mask_type == 'right_lower_hemi':
             mask = Mask.createSimpleMask(verts, -np.pi, .0, -np.pi/2, .0)
+
+        ## Tetarsphere
+        # Horizontal stripes
+        elif mask_type == 'left_upper_tetar':
+            mask = Mask.createSimpleMask(verts, .0, np.pi, .0, np.pi / 2)
+
+        elif mask_type == 'left_lower_tetar':
+            mask = Mask.createSimpleMask(verts, .0, np.pi, -np.pi / 2, .0)
+
+        elif mask_type == 'right_upper_tetar':
+            mask = Mask.createSimpleMask(verts, -np.pi, .0, .0, np.pi / 2)
+
+        elif mask_type == 'right_lower_tetar':
+            mask = Mask.createSimpleMask(verts, -np.pi, .0, -np.pi / 2, .0)
+
+        # Vertical stripes
+        elif mask_type == 'front_left_tetar':
+            mask = Mask.createSimpleMask(verts, .0, np.pi / 2, -np.inf, np.inf)
+
+        elif mask_type == 'front_right_tetar':
+            mask = Mask.createSimpleMask(verts, -np.pi / 2, .0, -np.inf, np.inf)
+
+        elif mask_type == 'rear_left_tetar':
+            mask = Mask.createSimpleMask(verts, np.pi / 2, np.pi, -np.inf, np.inf)
+
+        elif mask_type == 'rear_right_tetar':
+            mask = Mask.createSimpleMask(verts, -np.pi, -np.pi / 2, -np.inf, np.inf)
+
+        ## Ogdoosphere
+        # Horizontal stripes
+        elif mask_type == 'left_up_up_ogdoo':
+            mask = Mask.createHorizontalStripeMask(verts, np.pi / 2, -(3 * np.pi / 8), np.pi / 4)
+
+        elif mask_type == 'left_up_mi_ogdoo':
+            mask = Mask.createHorizontalStripeMask(verts, np.pi / 2, -np.pi / 8, np.pi / 4)
+
+        elif mask_type == 'left_lo_lo_ogdoo':
+            mask = Mask.createHorizontalStripeMask(verts, np.pi / 2, (3 * np.pi / 8), np.pi / 4)
+
+        elif mask_type == 'left_lo_mi_ogdoo':
+            mask = Mask.createHorizontalStripeMask(verts, np.pi / 2, np.pi / 8, np.pi / 4)
+
+        elif mask_type == 'rigth_up_up_ogdoo':
+            mask = Mask.createHorizontalStripeMask(verts, -np.pi / 2, (3 * np.pi / 8), np.pi / 4)
+
+        elif mask_type == 'rigth_up_mi_ogdoo':
+            mask = Mask.createHorizontalStripeMask(verts, -np.pi / 2, np.pi / 8, np.pi / 4)
+
+        elif mask_type == 'rigth_lo_lo_ogdoo':
+            mask = Mask.createHorizontalStripeMask(verts, -np.pi / 2, -(3 * np.pi / 8), np.pi / 4)
+
+        elif mask_type == 'rigth_lo_mi_ogdoo':
+            mask = Mask.createHorizontalStripeMask(verts, -np.pi / 2, -np.pi / 8, np.pi / 4)
+
+        # Vertical stripes
+        elif mask_type == 'fr_fr_le_ogdoo':
+            mask = Mask.createSimpleMask(verts, (3 * np.pi / 4), np.inf, -np.inf, np.inf)
+
+        elif mask_type == 'fr_le_le_ogdoo':
+            mask = Mask.createSimpleMask(verts, np.pi / 4, np.pi / 2, -np.inf, np.inf)
+
+        elif mask_type == 'fr_fr_ri_ogdoo':
+            mask = Mask.createSimpleMask(verts, -np.inf, (3 * -np.pi / 4), -np.inf, np.inf)
+
+        elif mask_type == 'fr_ri_ri_ogdoo':
+            mask = Mask.createSimpleMask(verts, (3 * -np.pi / 4), -np.pi / 2, -np.inf, np.inf)
+
+        elif mask_type == 're_re_le_ogdoo':
+            mask = Mask.createSimpleMask(verts, (3 * np.pi / 4), np.pi, -np.inf, np.inf)
+
+        elif mask_type == 're_le_le_ogdoo':
+            mask = Mask.createSimpleMask(verts, np.pi / 2, (3 * np.pi / 4), -np.inf, np.inf)
+
+        elif mask_type == 're_re_ri_ogdoo':
+            mask = Mask.createSimpleMask(verts, -np.pi, -(3 * np.pi / 4), -np.inf, np.inf)
+
+        elif mask_type == 're_ri_ri_ogdoo':
+            mask = Mask.createSimpleMask(verts, -(3 * np.pi / 4), -np.pi / 2, -np.inf, np.inf)
 
         ## Complex masks
         elif mask_type == 'transl_stripe_left':
@@ -350,6 +447,7 @@ class Stimulus:
         self.data = np.concatenate(self.phases, axis=0)
 
     def saveAs(self, filename, ext='mat'):
+        print('Saving stimulus to %s.%s' % (filename, ext))
         self.compile()
 
         composed = dict(vertices=self.verts, stimulus=self.data[:,:,0])  # only save greyscale
@@ -407,7 +505,7 @@ if __name__ == '__main__':
     if 'example01' in sys.argv:
 
         frametime = .05
-        dur = 5.
+        dur = 10.
 
         stim = Stimulus()
 
@@ -415,7 +513,7 @@ if __name__ == '__main__':
         pattern = Pattern.Bars(sf=2.5/180)
 
         # Create translation stimuli
-        for v in np.linspace(0.5, 5., 10):
+        for v in np.linspace(5., 180., 7):
             background = createTranslationStimulus(stim.verts,
                                                    pattern=pattern, duration=dur, v=.0, frametime=frametime)
             pos_transl = createTranslationStimulus(stim.verts,
