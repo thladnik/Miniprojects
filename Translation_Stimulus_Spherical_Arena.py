@@ -7,6 +7,7 @@ Dev = False
 
 import numpy as np
 from numpy import ndarray
+from scipy.spatial import Delaunay
 from scipy.spatial.transform import Rotation
 from scipy.io import savemat
 import sys
@@ -19,6 +20,44 @@ if Dev:
     import IPython
 
 gr = 1.61803398874989484820
+
+class UVSphere:
+
+    def __init__(self, theta_lvls: int, phi_lvls: int, upper_phi: float = np.pi/2, radius: float = 1.0):
+        # Set attributes
+        self.theta_lvls = theta_lvls
+        self.phi_lvls = phi_lvls
+        self.upper_phi = upper_phi
+        self.radius = radius
+
+        # Construct sphere and prepare for projection
+        self._construct()
+
+    def _construct(self):
+        # Calculate coordinates in azimuth and elevation
+        az = np.linspace(-np.pi, np.pi, self.theta_lvls, endpoint=False)
+        el = np.linspace(-np.pi/2, self.upper_phi, self.phi_lvls, endpoint=True)
+        self.thetas, self.phis = np.meshgrid(az, el)
+        self.thetas = self.thetas.flatten()
+        self.phis = self.phis.flatten()
+
+        self.vertices = Helper.sph2cart(self.thetas, self.phis, self.radius)
+
+    def getVertices(self):
+        return np.array(self.vertices).T
+
+    def getFaces(self):
+
+        vertices = self.getVertices()
+
+        # Calculate Delaunay tesselation
+        delaunay = Delaunay(vertices)
+        if delaunay.simplices.shape[1] > 3:
+            faceIdcs = delaunay.convex_hull
+        else:
+            faceIdcs = delaunay.simplices
+
+        return faceIdcs
 
 class IcosahedronSphere:
 
@@ -127,6 +166,14 @@ class Helper:
         el = np.arctan2(z, hxy)
         az = np.arctan2(y, x)
         return az, el, r
+
+    @staticmethod
+    def sph2cart(theta, phi, r):
+        rcos_theta = r * np.cos(phi)
+        x = rcos_theta * np.cos(theta)
+        y = rcos_theta * np.sin(theta)
+        z = r * np.sin(phi)
+        return np.array([x, y, z])
 
     @staticmethod
     def centralCylindrical2DTexture(theta, phi):
@@ -420,14 +467,20 @@ def applyMasks(verts, whole_field, *masked_stimuli):
 
 class Stimulus:
 
-    def __init__(self, use_iso = False):
+    def __init__(self, sphere_type = 'uv', uv_dims=dict(theta_lvls=100, phi_lvls=50)):
+        self.sphere_type = sphere_type
 
         # Create sphere
-        if use_iso:
+        if self.sphere_type == 'uv':
+            self.sphere = UVSphere(**uv_dims)
+
+            self.verts = self.sphere.getVertices()
+
+        elif self.sphere_type == 'iso':
             print('Using ISO sphere')
-            sphere = IcosahedronSphere(5)
-            self.verts = sphere.getVertices()
-            self.faces = sphere.getFaces()
+            self.sphere = IcosahedronSphere(5)
+            self.verts = self.sphere.getVertices()
+
         else:
             print('Using spherical LED arena coordinates')
             from h5py import File
@@ -450,7 +503,17 @@ class Stimulus:
         print('Saving stimulus to %s.%s' % (filename, ext))
         self.compile()
 
-        composed = dict(vertices=self.verts, stimulus=self.data[:,:,0])  # only save greyscale
+        thetas = np.unique(self.sphere.thetas)
+        phis = np.unique(self.sphere.phis)
+
+        geo_coords = np.zeros((thetas.shape[0], phis.shape[0], 2))
+        data = np.zeros((self.data.shape[0], thetas.shape[0], phis.shape[0]), dtype=np.uint8)
+        for i, t in enumerate(thetas):
+            for j, p in enumerate(phis):
+                geo_coords[i,j,:] = [t, p]
+                data[:,i,j] = self.data[:,(self.sphere.thetas == t) & (self.sphere.phis == p),0].flatten().astype(np.uint8)
+
+        composed = dict(geo_coords=geo_coords, stimulus=data)  # only save greyscale
         if ext == 'mat':
             savemat('%s.%s' % (filename, ext), composed)
 
@@ -460,7 +523,7 @@ class Stimulus:
         # Set MeshData
         md = gl.MeshData()
         md.setVertexes(self.verts)
-        md.setFaces(self.faces)
+        md.setFaces(self.sphere.getFaces())
 
         # Setup app and window
         app = QtWidgets.QApplication([])
@@ -507,7 +570,7 @@ if __name__ == '__main__':
         frametime = .05
         dur = 10.
 
-        stim = Stimulus()
+        stim = Stimulus(uv_dims=dict(theta_lvls=360, phi_lvls=180))
 
         # Create a pattern
         pattern = Pattern.Bars(sf=2.5/180)
@@ -527,7 +590,7 @@ if __name__ == '__main__':
                                )
             stim.addPhase(phase)
 
-        stim.display(frametime)
+        #stim.display(frametime)
 
         stim.saveAs('example01')
 
