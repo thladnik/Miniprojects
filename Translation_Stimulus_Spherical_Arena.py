@@ -506,12 +506,12 @@ class Stimulus:
         thetas = np.unique(self.sphere.thetas)
         phis = np.unique(self.sphere.phis)
 
-        geo_coords = np.zeros((thetas.shape[0], phis.shape[0], 2))
-        data = np.zeros((self.data.shape[0], thetas.shape[0], phis.shape[0]), dtype=np.uint8)
+        geo_coords = np.zeros((phis.shape[0], thetas.shape[0], 2))
+        data = np.zeros((phis.shape[0], thetas.shape[0], self.data.shape[0]), dtype=np.uint8)
         for i, t in enumerate(thetas):
             for j, p in enumerate(phis):
-                geo_coords[i,j,:] = [t, p]
-                data[:,i,j] = self.data[:,(self.sphere.thetas == t) & (self.sphere.phis == p),0].flatten().astype(np.uint8)
+                geo_coords[j,i,:] = [p, t]
+                data[j,i,:] = self.data[:,(self.sphere.thetas == t) & (self.sphere.phis == p),0].flatten().astype(np.uint8)
 
         composed = dict(geo_coords=geo_coords, stimulus=data)  # only save greyscale
         if ext == 'mat':
