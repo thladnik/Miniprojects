@@ -309,7 +309,7 @@ def createTranslationStimulus(verts, v: float = 1., duration: float = 5., framet
     # Return stimulus frames
     return np.array(stimulus)
 
-def applyMasks(verts, whole_field, *masked_stimuli):
+def applyMasks(verts, whole_field, *masked_stimuli, blank_fraction = 0.05):
     """Applies a set of predefined masks with the specified stimuli.
 
     :param verts: vertices that make up the sphere (2d ndarray)
@@ -330,7 +330,6 @@ def applyMasks(verts, whole_field, *masked_stimuli):
       > transl_stripe_right  : an oval-like mask spanning horizontally from front to back
       > transl_stripes_symm  : two oval-like masks spanning horizontally from front to back
     """
-
     # Set background
     stimulus = whole_field
 
@@ -459,7 +458,7 @@ def applyMasks(verts, whole_field, *masked_stimuli):
 
     # Before returning stimulus: blank front and back poles
     for fIdx in range(stimulus.shape[0]):
-        stimulus[fIdx,(verts[:, 0] > .95) | (verts[:, 0] < -.95),:] = np.array([.0, .0, .0, 1.0])
+        stimulus[fIdx,(verts[:, 0] > 1.0-blank_fraction) | (verts[:, 0] < -1.0+blank_fraction),:] = np.array([.0, .0, .0, 1.0])
 
     # Return final stimulus
     return stimulus
@@ -570,7 +569,7 @@ if __name__ == '__main__':
         frametime = .05
         dur = 10.
 
-        stim = Stimulus(uv_dims=dict(theta_lvls=360, phi_lvls=180))
+        stim = Stimulus(uv_dims=dict(theta_lvls=100, phi_lvls=50))
 
         # Create a pattern
         pattern = Pattern.Bars(sf=2.5/180)
@@ -590,7 +589,7 @@ if __name__ == '__main__':
                                )
             stim.addPhase(phase)
 
-        #stim.display(frametime)
+        stim.display(frametime)
 
         stim.saveAs('example01')
 
@@ -600,7 +599,6 @@ if __name__ == '__main__':
         dur = 5.
 
         stim = Stimulus()
-
 
         # Create translation stimuli
         for sf in np.linspace(1./180, 5./180, 5):
