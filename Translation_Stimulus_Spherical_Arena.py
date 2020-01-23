@@ -196,7 +196,7 @@ class Pattern:
     def Sinusoid(sf: float = 1.):
         def sinusoid(x: ndarray, shift: float, return_rgba: bool=True, **kwargs):
             #c = np.cos(180 * sf * np.pi * (x + np.pi * shift / 180))
-            c = np.cos(180 * sf * 2 * np.pi * (x + shift / 180))
+            c = np.cos(180 * sf * np.pi * (x + shift / 180))
             if return_rgba:
                 return Pattern._createGreyscaleRGBA(c)
             return c
@@ -572,7 +572,7 @@ if __name__ == '__main__':
         stim = Stimulus(uv_dims=dict(theta_lvls=100, phi_lvls=50))
 
         # Create a pattern
-        pattern = Pattern.Bars(sf=1/180)
+        pattern = Pattern.Bars(sf=2/180)
 
         # Create translation stimuli
         for v in np.linspace(5., 180., 7):
