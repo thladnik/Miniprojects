@@ -196,7 +196,7 @@ class Pattern:
     def Sinusoid(sf: float = 1.):
         def sinusoid(x: ndarray, shift: float, return_rgba: bool=True, **kwargs):
             #c = np.cos(180 * sf * np.pi * (x + np.pi * shift / 180))
-            c = np.cos(180 * sf * np.pi * (x + shift / 360))
+            c = np.cos(180 * sf * np.pi * (x + shift / 90))
             if return_rgba:
                 return Pattern._createGreyscaleRGBA(c)
             return c
@@ -346,16 +346,16 @@ def applyMasks(verts, whole_field, *masked_stimuli, blank_fraction = 0.05):
 
         ## Simple masks
         if mask_type == 'left_hemi':
-            mask = Mask.createSimpleMask(verts, .0, np.pi, -np.pi/2, np.pi/2)
-
-        elif mask_type == 'left_lower_hemi':
-            mask = Mask.createSimpleMask(verts, .0, np.pi, -np.pi/2, .0)
+            mask = Mask.createSimpleMask(verts, .0, np.pi, -np.pi / 2, np.pi / 2)
 
         elif mask_type == 'right_hemi':
-            mask = Mask.createSimpleMask(verts, -np.pi, .0, -np.pi/2, .0)
+            mask = Mask.createSimpleMask(verts, -np.pi, .0, -np.pi / 2, np.pi / 2)
 
-        elif mask_type == 'right_lower_hemi':
-            mask = Mask.createSimpleMask(verts, -np.pi, .0, -np.pi/2, .0)
+        elif mask_type == 'upper_hemi':
+            mask = Mask.createSimpleMask(verts, -np.pi, np.pi, .0, np.pi / 2)
+
+        elif mask_type == 'lower_hemi':
+            mask = Mask.createSimpleMask(verts, -np.pi, np.pi, -np.pi / 2, .0)
 
         ## Tetarsphere
         # Horizontal stripes
@@ -412,16 +412,16 @@ def applyMasks(verts, whole_field, *masked_stimuli, blank_fraction = 0.05):
 
         # Vertical stripes
         elif mask_type == 'fr_fr_le_ogdoo':
-            mask = Mask.createSimpleMask(verts, (3 * np.pi / 4), np.inf, -np.inf, np.inf)
+            mask = Mask.createSimpleMask(verts, (-np.pi / 4), 0., -np.inf, np.inf)
 
         elif mask_type == 'fr_le_le_ogdoo':
             mask = Mask.createSimpleMask(verts, np.pi / 4, np.pi / 2, -np.inf, np.inf)
 
         elif mask_type == 'fr_fr_ri_ogdoo':
-            mask = Mask.createSimpleMask(verts, -np.inf, (3 * -np.pi / 4), -np.inf, np.inf)
+            mask = Mask.createSimpleMask(verts, 0., (np.pi / 4), -np.inf, np.inf)
 
         elif mask_type == 'fr_ri_ri_ogdoo':
-            mask = Mask.createSimpleMask(verts, (3 * -np.pi / 4), -np.pi / 2, -np.inf, np.inf)
+            mask = Mask.createSimpleMask(verts, -np.pi / 2, -np.pi / 4, -np.inf, np.inf)
 
         elif mask_type == 're_re_le_ogdoo':
             mask = Mask.createSimpleMask(verts, (3 * np.pi / 4), np.pi, -np.inf, np.inf)
