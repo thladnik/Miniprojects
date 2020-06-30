@@ -172,7 +172,7 @@ def on_resize(width, height):
     std_fov = 30.
     std_elevation_rot = 90.
     std_radial_offset = 0.5
-    std_tangent_offset = 0.2
+    std_tangent_offset = 0.
 
     elevation_rot_sw = 0.
     elevation_rot_se = 0.

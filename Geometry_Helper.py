@@ -189,3 +189,43 @@ class UVSphere:
             faceIdcs = delaunay.simplices
 
         return faceIdcs
+
+class UVCylinder:
+
+    def __init__(self, theta_lvls, phi_lvls, radius=1.0, height=1.0):
+        # Set attributes
+        self.theta_lvls = theta_lvls
+        self.phi_lvls = phi_lvls
+        self.height = height
+        self.radius = radius
+
+        self._construct()
+
+    def _construct(self):
+
+        azims = np.linspace(-np.pi, np.pi, self.theta_lvls)
+        phis = np.linspace(-self.height/2.0, self.height/2.0, self.phi_lvls)
+
+        self.thetas, self.phis = np.meshgrid(azims, phis)
+        self.thetas = self.thetas.flatten()
+        self.phis = self.phis.flatten()
+
+    def getVertices(self):
+        x = self.radius * np.sin(self.thetas)
+        y = self.radius * np.cos(self.thetas)
+        z = self.phis
+
+        return np.asarray([x, y, z]).T
+
+    def getFaceIndices(self):
+
+        vertices = self.getVertices()
+
+        # Calculate Delaunay tesselation
+        delaunay = Delaunay(vertices)
+        if delaunay.simplices.shape[1] > 3:
+            faceIdcs = delaunay.convex_hull
+        else:
+            faceIdcs = delaunay.simplices
+
+        return faceIdcs
