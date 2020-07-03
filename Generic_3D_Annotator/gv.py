@@ -1,0 +1,28 @@
+import h5py
+from gui import HDF5ImageView
+from PyQt5.QtWidgets import QApplication
+from numpy import ndarray
+from gui import MainWindow, Statusbar
+
+### Key definitions
+KEY_PROCESSED : str = 'processed'
+KEY_ORIGINAL  : str = 'original'
+KEY_OBJLIST   : str = 'obj_list'
+KEY_OBJSTR    : str = 'obj'
+KEY_NODES     : str = 'nodes'
+KEY_NODEINTERP: str = 'node_interp'
+KEY_ROT       : str = 'rotation'
+KEY_FRAMEIDCS : str = 'frame_indices'
+KEY_TIME      : str = 'time'
+KEY_FPS       : str = 'fps'
+
+app             : QApplication    = None
+w               : MainWindow      = None
+statusbar       : Statusbar       = None
+
+filepath        : str             = None
+open_dir        : str             = None
+f               : h5py.File       = None
+cur_obj_name    : str             = None
+set_axes        : bool            = False
+cmap_lut        : ndarray         = None
