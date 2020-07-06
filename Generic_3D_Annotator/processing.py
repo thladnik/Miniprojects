@@ -1,4 +1,6 @@
 import cv2
+import numpy as np
+from skimage.filters import threshold_otsu
 
 import gv
 from median_subtraction import median_norm
@@ -31,5 +33,29 @@ def adaptive_threshold_filter(image, maxval, amethod, ttype, block_size, c):
 
     return thresh
 
-def run_object_detection():
-    pass
+def particle_detector(image, percentile):
+
+    ### Separate cell image from background with Otsu thresholding
+    cell = image > threshold_otsu(image)
+
+    ### Filter birghtest pixels
+    potential_centers = image > np.percentile(image[cell], percentile)
+
+    ### Detect contours
+    cnts, hier = cv2.findContours(potential_centers.astype(np.uint8) * 255, cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
+
+    ### Reverse sort contour indices by area
+    areas = sorted([(cv2.contourArea(cnt), i) for i, cnt in enumerate(cnts)])[::-1]
+
+    ### Filter all contours with > 2 contour points
+    cnts2 = [cnts[i] for a, i in areas if a > 0]
+
+    return cnts2
+
+def particle_filter(image, percentile, ):
+
+    cnts = particle_detector(image[:,:,0], percentile)
+
+    cv2.drawContours(image, cnts, -1, (255, 255, 255), 3)
+
+    return image

@@ -31,10 +31,12 @@ def open_file():
 
     ### Set video
     gv.w.setDataset(gv.KEY_ORIGINAL)
-    gv.w.updateRotation(0)
+    gv.w.updateRotationFilter(0)
     # main.update_axes_table()
 
     gv.w.setTitle(gv.filepath)
+
+    gv.w.rpanel.setEnabled(True)
 
 
 def close_file():
@@ -47,6 +49,7 @@ def close_file():
     gv.filepath = None
     gv.w.setTitle()
     gv.w.setDataset(None)
+    gv.w.rpanel.setEnabled(False)
 
 
 ################################################################
@@ -153,6 +156,8 @@ def import_file():
     ### Set video
     gv.w.setTitle(gv.filepath)
     gv.w.setDataset(gv.KEY_ORIGINAL)
+
+    gv.w.rpanel.setEnabled(True)
 
 
 ################################

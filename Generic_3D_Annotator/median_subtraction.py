@@ -56,7 +56,7 @@ def run():
 
     ### Save to file
     gv.statusbar.startBlocking('Saving...')
-    gv.f[gv.KEY_PROCESSED][:] = video_out#.astype(np.uint8)
+    gv.f[gv.KEY_PROCESSED][:] = video_out
     gv.statusbar.setReady()
 
 ################

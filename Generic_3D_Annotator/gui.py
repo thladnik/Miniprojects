@@ -11,6 +11,7 @@ import object_handling
 import processing
 import axis_calibration
 import median_subtraction
+import particle_detection
 
 
 ################################
@@ -43,16 +44,16 @@ class MainWindow(QtWidgets.QMainWindow):
         self.mb_file_import.triggered.connect(file_handling.import_file)
         self.mb_image = self.mb.addMenu('Image')
         self.mb_image.act_rot_90cw = self.mb_image.addAction('Rotate 90° CW')
-        self.mb_image.act_rot_90cw.triggered.connect(lambda: self.updateRotation(-1))
+        self.mb_image.act_rot_90cw.triggered.connect(lambda: self.updateRotationFilter(-1))
         self.mb_image.act_rot_90ccw = self.mb_image.addAction('Rotate 90° CCW')
-        self.mb_image.act_rot_90ccw.triggered.connect(lambda: self.updateRotation(1))
+        self.mb_image.act_rot_90ccw.triggered.connect(lambda: self.updateRotationFilter(1))
         self.mb_image.act_rot_180 = self.mb_image.addAction('Rotate 180°')
-        self.mb_image.act_rot_180.triggered.connect(lambda: self.updateRotation(2))
+        self.mb_image.act_rot_180.triggered.connect(lambda: self.updateRotationFilter(2))
         self.mb_process = self.mb.addMenu('Processing')
         self.mb_process.act_median_sub = self.mb_process.addAction('Median subtraction + Range normalization')
         self.mb_process.act_median_sub.triggered.connect(median_subtraction.run)
-        self.mb_process.act_object_detect = self.mb_process.addAction('Object detection')
-        self.mb_process.act_object_detect.triggered.connect(processing.run_object_detection)
+        self.mb_process.act_part_detect = self.mb_process.addAction('Particle detection')
+        self.mb_process.act_part_detect.triggered.connect(particle_detection.run)
         
         ################
         ### Create ImageView
@@ -66,10 +67,11 @@ class MainWindow(QtWidgets.QMainWindow):
         ################
         ### Create right panel
         
-        rpanel = QtWidgets.QWidget()
-        rpanel.setFixedWidth(500)
-        rpanel.setLayout(QtWidgets.QVBoxLayout())
-        self.cw.layout().addWidget(rpanel, 0, 1)
+        self.rpanel = QtWidgets.QWidget()
+        self.rpanel.setEnabled(False)
+        self.rpanel.setFixedWidth(500)
+        self.rpanel.setLayout(QtWidgets.QVBoxLayout())
+        self.cw.layout().addWidget(self.rpanel, 0, 1)
         
         ########
         ### Display
@@ -81,7 +83,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.gb_display.btn_processed = QtWidgets.QPushButton('Processed')
         self.gb_display.btn_processed.clicked.connect(lambda: self.setDataset(gv.KEY_PROCESSED))
         self.gb_display.layout().addWidget(self.gb_display.btn_processed)
-        rpanel.layout().addWidget(self.gb_display)
+        self.rpanel.layout().addWidget(self.gb_display)
         
         ########
         ### Calibration
@@ -128,40 +130,46 @@ class MainWindow(QtWidgets.QMainWindow):
         self.gb_calib.layout().addWidget(self.gb_calib.btn_add_ref)
         
         # Add to centralwidget
-        rpanel.layout().addWidget(self.gb_calib)
+        self.rpanel.layout().addWidget(self.gb_calib)
         
         ########
         ### Threshold
         self.gb_thresh = ThresholdWidget('Test CV2 Threshold')
         ## Connect events
         # Threshold
-        self.gb_thresh.toggled.connect(self.updateThreshold)
-        self.gb_thresh.thresh.valueChanged.connect(self.updateThreshold)
-        self.gb_thresh.maxval.valueChanged.connect(self.updateThreshold)
-        self.gb_thresh.threshtype.currentTextChanged.connect(self.updateThreshold)
+        self.gb_thresh.toggled.connect(self.updateThresholdFilter)
+        self.gb_thresh.thresh.valueChanged.connect(self.updateThresholdFilter)
+        self.gb_thresh.maxval.valueChanged.connect(self.updateThresholdFilter)
+        self.gb_thresh.threshtype.currentTextChanged.connect(self.updateThresholdFilter)
         # Adaptive
-        self.gb_thresh.gb_adaptive.toggled.connect(self.updateThreshold)
-        self.gb_thresh.gb_adaptive.method.currentTextChanged.connect(self.updateThreshold)
-        self.gb_thresh.gb_adaptive.block_size.valueChanged.connect(self.updateThreshold)
-        self.gb_thresh.gb_adaptive.constant.valueChanged.connect(self.updateThreshold)
+        self.gb_thresh.gb_adaptive.toggled.connect(self.updateThresholdFilter)
+        self.gb_thresh.gb_adaptive.method.currentTextChanged.connect(self.updateThresholdFilter)
+        self.gb_thresh.gb_adaptive.block_size.valueChanged.connect(self.updateThresholdFilter)
+        self.gb_thresh.gb_adaptive.constant.valueChanged.connect(self.updateThresholdFilter)
         ## Add to panel
-        rpanel.layout().addWidget(self.gb_thresh)
+        self.rpanel.layout().addWidget(self.gb_thresh)
+
+        ########
+        ### Particle detection
+        self.gb_part_detect = ParticleDetectionWidget('Test particle detection')
+        self.gb_part_detect.toggled.connect(self.updateParticleDetectionFilter)
+        self.rpanel.layout().addWidget(self.gb_part_detect)
 
         ########
         ### Median subtration + range normalization
-        self.gb_med_norm = QtWidgets.QGroupBox('Test Median subtraction + Normalization')
+        self.gb_med_norm = QtWidgets.QGroupBox('Test median subtraction + Normalization')
         self.gb_med_norm.setLayout(QtWidgets.QGridLayout())
         self.gb_med_norm.setCheckable(True)
         self.gb_med_norm.setChecked(False)
-        self.gb_med_norm.toggled.connect(self.updateMedianSubtraction)
+        self.gb_med_norm.toggled.connect(self.updateMedianSubtractionFilter)
         self.gb_med_norm.med_range = QtWidgets.QSpinBox()
         self.gb_med_norm.med_range.setMinimum(2)
         self.gb_med_norm.med_range.setValue(20)
-        self.gb_med_norm.med_range.valueChanged.connect(self.updateMedianSubtraction)
+        self.gb_med_norm.med_range.valueChanged.connect(self.updateMedianSubtractionFilter)
         self.gb_med_norm.layout().addWidget(QLabel('Range'), 0, 0)
         self.gb_med_norm.layout().addWidget(self.gb_med_norm.med_range, 0, 1)
 
-        rpanel.layout().addWidget(self.gb_med_norm)
+        self.rpanel.layout().addWidget(self.gb_med_norm)
 
         
         ########
@@ -172,10 +180,10 @@ class MainWindow(QtWidgets.QMainWindow):
         self.gb_objects.btn_new_object = QtWidgets.QPushButton('New object')
         self.gb_objects.btn_new_object.clicked.connect(object_handling.create_object)
         self.gb_objects.layout().addWidget(self.gb_objects.btn_new_object)
-        rpanel.layout().addWidget(self.gb_objects)
+        self.rpanel.layout().addWidget(self.gb_objects)
         
         vSpacer = QtWidgets.QSpacerItem(1, 1, QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.Expanding)
-        rpanel.layout().addItem(vSpacer)
+        self.rpanel.layout().addItem(vSpacer)
         
         ### Add statusbar
         gv.statusbar = Statusbar()
@@ -188,7 +196,13 @@ class MainWindow(QtWidgets.QMainWindow):
         sub = ' - {}'.format(sub) if not(sub is None) else ''
         self.setWindowTitle('3D Annotator' + sub)
 
-    def getThresholdParams(self):
+    def updateParticleDetectionFilter(self):
+        if self.gb_part_detect.isChecked():
+            self.viewer.addImageFilter('particle_detection', processing.particle_filter, 20, [99])
+        else:
+            self.viewer.removeImageFilter('particle_detection')
+
+    def getThresholdFilter(self):
         if self.gb_thresh.gb_adaptive.isChecked():
             fun = processing.adaptive_threshold_filter
             args = [self.gb_thresh.maxval.value(),
@@ -205,24 +219,24 @@ class MainWindow(QtWidgets.QMainWindow):
 
         return fun, args
 
-    def updateMedianSubtraction(self):
+    def updateMedianSubtractionFilter(self):
         if self.gb_med_norm.isChecked():
             self.viewer.addImageFilter('median_sub', processing.median_norm_filter, 5, [self.gb_med_norm.med_range.value()])
 
         else:
             self.viewer.removeImageFilter('median_sub')
 
-    def updateThreshold(self):
+    def updateThresholdFilter(self):
         if self.gb_thresh.isChecked():
 
-            fun, args = self.getThresholdParams()
+            fun, args = self.getThresholdFilter()
 
             self.viewer.addImageFilter('threshold', fun, 11, args)
 
         else:
             self.viewer.removeImageFilter('threshold')
 
-    def updateRotation(self, dir):
+    def updateRotationFilter(self, dir):
         if not(gv.KEY_ROT in gv.f.attrs):
             gv.f.attrs[gv.KEY_ROT] = 0
         gv.f.attrs[gv.KEY_ROT] += dir
@@ -230,6 +244,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.viewer.removeImageFilter('rotation')
         self.viewer.addImageFilter('rotation', np.rot90, 1, [gv.f.attrs[gv.KEY_ROT]])
         self.viewer.slider.valueChanged.emit(self.viewer.slider.value())
+
 
     def setDataset(self, dsetName):
         if gv.f is None:
@@ -350,7 +365,21 @@ class ThresholdWidget(QtWidgets.QGroupBox):
         self.gb_adaptive.layout().addWidget(self.gb_adaptive.constant, 2, 1)
         # Add adaptive
         self.layout().addWidget(self.gb_adaptive, 3, 0, 1, 2)
-        
+
+
+class ParticleDetectionWidget(QtWidgets.QGroupBox):
+
+    def __init__(self, *args):
+        QtWidgets.QGroupBox.__init__(self, *args)
+
+        self.setCheckable(True)
+        self.setChecked(False)
+        self.setLayout(QtWidgets.QGridLayout())
+
+
+
+
+
 
 ################################
 ### HDF5ImageView

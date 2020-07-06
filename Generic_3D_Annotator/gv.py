@@ -15,6 +15,9 @@ KEY_ROT       : str = 'rotation'
 KEY_FRAMEIDCS : str = 'frame_indices'
 KEY_TIME      : str = 'time'
 KEY_FPS       : str = 'fps'
+KEY_PARTICLES : str = 'particles'
+KEY_PART_CENTR: str = 'particle_centroids'
+KEY_PART_AREA : str = 'particle_area'
 
 app             : QApplication    = None
 w               : MainWindow      = None
