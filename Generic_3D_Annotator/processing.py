@@ -8,7 +8,7 @@ from median_subtraction import median_norm
 
 def median_norm_filter(image, med_range):
     dshape = gv.f[gv.KEY_ORIGINAL].shape
-    i = gv.viewer.slider.value()
+    i = gv.w.viewer.slider.value()
 
     start = i - med_range
     end = i + med_range
@@ -33,13 +33,23 @@ def adaptive_threshold_filter(image, maxval, amethod, ttype, block_size, c):
 
     return thresh
 
-def particle_detector(image, percentile):
+def particle_detector(image, thresh_rule, std_mult):
 
     ### Separate cell image from background with Otsu thresholding
-    cell = image > threshold_otsu(image)
+    #cell = image > threshold_otsu(image, nbins_otsu)
 
-    ### Filter birghtest pixels
-    potential_centers = image > np.percentile(image[cell], percentile)
+    ### Filter brightest pixels
+    #potential_centers = image > np.percentile(image[cell], percentile)
+    #potential_centers = image > percentile
+
+    if thresh_rule == '>':
+        comp = np.greater
+        op = np.add
+    else:
+        comp = np.less
+        op = np.subtract
+
+    potential_centers = comp(image, op(np.mean(image), std_mult * np.std(image)))
 
     ### Detect contours
     cnts, hier = cv2.findContours(potential_centers.astype(np.uint8) * 255, cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
@@ -52,9 +62,9 @@ def particle_detector(image, percentile):
 
     return cnts2
 
-def particle_filter(image, percentile, ):
+def particle_filter(image, *args):
 
-    cnts = particle_detector(image[:,:,0], percentile)
+    cnts = particle_detector(image[:,:,0], *args)
 
     cv2.drawContours(image, cnts, -1, (255, 255, 255), 3)
 

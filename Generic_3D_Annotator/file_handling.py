@@ -6,6 +6,7 @@ from PyQt5.QtWidgets import QLabel
 import time
 
 import gv
+import object_handling
 
 ################################################################
 ### File handling functions
@@ -38,6 +39,8 @@ def open_file():
 
     gv.w.rpanel.setEnabled(True)
 
+    #gv.w.updateParticleMarkers()
+
 
 def close_file():
     if not(gv.f is None):
@@ -45,6 +48,8 @@ def close_file():
         gv.f.close()
         gv.f = None
 
+
+    object_handling.clear_objects()
 
     gv.filepath = None
     gv.w.setTitle()

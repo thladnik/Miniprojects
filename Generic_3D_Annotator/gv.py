@@ -26,6 +26,7 @@ statusbar       : Statusbar       = None
 filepath        : str             = None
 open_dir        : str             = None
 f               : h5py.File       = None
+dset            : h5py.Dataset    = None
 cur_obj_name    : str             = None
 set_axes        : bool            = False
 cmap_lut        : ndarray         = None

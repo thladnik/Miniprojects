@@ -27,9 +27,22 @@ def create_object():
 
     ### Set current object name to new object
     print('Created new Object {}'.format(new_obj))
-    edit_object(new_obj)
 
     create_node_marker(new_obj)
+    edit_object(new_obj)
+
+def clear_objects():
+
+    obj_names = list(gv.w.viewer.objects)
+    for obj_name in obj_names:
+        data = gv.w.viewer.objects[obj_name]
+        data['btn'].setParent(None)
+        del data['btn']
+        gv.w.viewer.view.removeItem(data['marker'])
+        del data['marker']
+        del gv.w.viewer.objects[obj_name]
+
+    gv.cur_obj_name = None
 
 
 def create_node_marker(obj_name):
@@ -49,7 +62,7 @@ def create_node_marker(obj_name):
     btn = QtWidgets.QPushButton('Object {}'.format(obj_name))
     btn.clicked.connect(lambda: edit_object(obj_name))
     btn.setStyleSheet('background-color: rgb({},{},{})'.format(*rgb))
-    gv.w.gb_objects.layout().addWidget(btn)
+    gv.w.gb_objects.wdgt_buttons.layout().addWidget(btn)
     gv.w.viewer.objects[obj_name]['btn'] = btn
 
     ### Create dedicated marker
@@ -60,8 +73,16 @@ def create_node_marker(obj_name):
     gv.w.viewer.view.addItem(plotItem)
     gv.w.viewer.objects[obj_name]['marker'] = plotItem
 
-def edit_object(idx):
-    gv.cur_obj_name = idx
+def edit_object(obj_name):
+    gv.cur_obj_name = obj_name
+
+    for i, obj in gv.w.viewer.objects.items():
+        rgb = gv.cmap_lut[list(gv.f.attrs[gv.KEY_OBJLIST]).index(i), :3]
+        obj['btn'].setStyleSheet('background-color: rgb({},{},{}); font-weight:normal;'.format(*rgb))
+
+    rgb = gv.cmap_lut[list(gv.f.attrs[gv.KEY_OBJLIST]).index(obj_name), :3]
+    gv.w.viewer.objects[obj_name]['btn'].setStyleSheet(
+        'background-color: rgb({},{},{}); font-weight:bold;'.format(*rgb))
 
     print('Edit Object {}'.format(gv.cur_obj_name))
 
@@ -143,4 +164,3 @@ def update_pos_marker():
         else:
             gv.w.viewer.objects[obj_name]['marker'].setData(x=[cur_pos[0]], y=[cur_pos[1]])
             gv.w.viewer.objects[obj_name]['marker'].setSymbolBrush(*rgb, 255)
-
