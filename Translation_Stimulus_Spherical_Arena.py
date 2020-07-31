@@ -498,7 +498,7 @@ class Stimulus:
     def compile(self):
         self.data = np.concatenate(self.phases, axis=0)
 
-    def saveAs(self, filename, ext='mat'):
+    def saveAs(self, filename, ext='mat', az_rot_angle=0., el_rot_angle=0.):
         print('Saving stimulus to %s.%s' % (filename, ext))
         self.compile()
 
@@ -509,7 +509,7 @@ class Stimulus:
         data = np.zeros((phis.shape[0], thetas.shape[0], self.data.shape[0]), dtype=np.uint8)
         for i, t in enumerate(thetas):
             for j, p in enumerate(phis):
-                geo_coords[j,i,:] = [p, t]
+                geo_coords[j,i,:] = [p+el_rot_angle, t+az_rot_angle]
                 data[j,i,:] = self.data[:,(self.sphere.thetas == t) & (self.sphere.phis == p),0].flatten().astype(np.uint8)
 
         composed = dict(geo_coords=geo_coords, stimulus=data)  # only save greyscale
@@ -591,7 +591,7 @@ if __name__ == '__main__':
 
         stim.display(frametime)
 
-        stim.saveAs('example01')
+        stim.saveAs('example01', az_rot_angle=np.pi/2)
 
     elif 'example02' in sys.argv:
 
