@@ -502,20 +502,17 @@ class Stimulus:
         print('Saving stimulus to %s.%s' % (filename, ext))
         self.compile()
 
-        thetas = np.unique(self.sphere.thetas)
-        phis = np.unique(self.sphere.phis)
+        thetas_full = self.sphere.thetas + az_rot_angle
+        phis_full = self.sphere.phis + el_rot_angle
+        thetas = np.unique(thetas_full)
+        phis = np.unique(phis_full)
 
         geo_coords = np.zeros((phis.shape[0], thetas.shape[0], 2))
         data = np.zeros((phis.shape[0], thetas.shape[0], self.data.shape[0]), dtype=np.uint8)
         for i, t in enumerate(thetas):
             for j, p in enumerate(phis):
-                t += az_rot_angle
-                if t > np.pi:
-                    t = -(t-np.pi)
-                if t < -np.pi:
-                    t = -(t+np.pi)
                 geo_coords[j,i,:] = [p, t]
-                data[j,i,:] = self.data[:,(self.sphere.thetas == t) & (self.sphere.phis == p),0].flatten().astype(np.uint8)
+                data[j,i,:] = self.data[:,(thetas_full == t) & (phis_full == p),0].flatten().astype(np.uint8)
 
         composed = dict(geo_coords=geo_coords, stimulus=data)  # only save greyscale
         if ext == 'mat':
