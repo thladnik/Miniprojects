@@ -503,7 +503,11 @@ class Stimulus:
         self.compile()
 
         thetas_full = self.sphere.thetas + az_rot_angle
-        phis_full = self.sphere.phis + el_rot_angle
+        over = thetas_full > np.pi
+        thetas_full[over] = -2 * np.pi + thetas_full[over]
+        under = thetas_full < -np.pi
+        thetas_full[under] = 2 * np.pi + thetas_full[under]
+        phis_full = self.sphere.phis# + el_rot_angle
         thetas = np.unique(thetas_full)
         phis = np.unique(phis_full)
 
@@ -593,7 +597,7 @@ if __name__ == '__main__':
 
         stim.display(frametime)
 
-        stim.saveAs('example01', az_rot_angle=np.pi/2)
+        stim.saveAs('example01')#, az_rot_angle=np.pi/2)
 
     elif 'example02' in sys.argv:
 
