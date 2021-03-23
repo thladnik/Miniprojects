@@ -309,7 +309,7 @@ def createTranslationStimulus(verts, v: float = 1., duration: float = 5., framet
     # Return stimulus frames
     return np.array(stimulus)
 
-def applyMasks(verts, whole_field, *masked_stimuli, blank_fraction = 0.05):
+def applyMasks(verts, whole_field, *masked_stimuli, blank_fraction_x = 0.05, blank_fraction_z=0.0):
     """Applies a set of predefined masks with the specified stimuli.
 
     :param verts: vertices that make up the sphere (2d ndarray)
@@ -457,8 +457,10 @@ def applyMasks(verts, whole_field, *masked_stimuli, blank_fraction = 0.05):
             print('WARNING: no mask of type <%s>' % mask_type)
 
     # Before returning stimulus: blank front and back poles
+    blanked_x = (verts[:, 0] > 1.0 - blank_fraction_x) | (verts[:, 0] < -1.0 + blank_fraction_x)
+    blanked_z = (verts[:, 2] > 1.0 - blank_fraction_z) | (verts[:, 2] < -1.0 + blank_fraction_z)
     for fIdx in range(stimulus.shape[0]):
-        stimulus[fIdx,(verts[:, 0] > 1.0-blank_fraction) | (verts[:, 0] < -1.0+blank_fraction),:] = np.array([.0, .0, .0, 1.0])
+        stimulus[fIdx, (blanked_x) | (blanked_z) , :] = np.array([.0, .0, .0, 1.0])
 
     # Return final stimulus
     return stimulus
@@ -575,7 +577,7 @@ if __name__ == '__main__':
         frametime = .05
         dur = 10.
 
-        stim = Stimulus(uv_dims=dict(theta_lvls=100, phi_lvls=50))
+        stim = Stimulus(uv_dims=dict(theta_lvls=100, phi_lvls=100))
 
         # Create a pattern
         pattern = Pattern.Bars(sf=2/180)
@@ -592,6 +594,7 @@ if __name__ == '__main__':
             phase = applyMasks(stim.verts, background,
                                ['transl_stripe_symm', np.pi / 4, np.pi / 4, pos_transl],
                                ['transl_stripe_symm', -np.pi / 4, np.pi / 4, neg_transl],
+                               blank_fraction_z=0.05
                                )
             stim.addPhase(phase)
 
